@@ -1,0 +1,21 @@
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+.env
+.env.*
+!.env.example
+__pycache__/
+.pytest_cache/
+.venv/
+*.egg-info/
+*.py[cod]
+apps/api/prisma/*.db
+
+# Private keys and certificate bundles
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore

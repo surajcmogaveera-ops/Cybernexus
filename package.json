@@ -1,0 +1,20 @@
+{
+  "name": "cybernexus",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "pnpm --filter @cybernexus/shared build && pnpm --parallel --filter @cybernexus/web --filter @cybernexus/api dev",
+    "build": "pnpm --filter @cybernexus/shared build && pnpm --filter @cybernexus/web build && pnpm --filter @cybernexus/api build",
+    "typecheck": "pnpm --filter @cybernexus/shared build && pnpm --filter @cybernexus/shared typecheck && pnpm --filter @cybernexus/web typecheck && pnpm --filter @cybernexus/api typecheck",
+    "test": "pnpm --filter @cybernexus/shared build && pnpm --filter @cybernexus/shared test && pnpm --filter @cybernexus/api test && pnpm --filter @cybernexus/web test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @cybernexus/api prisma:generate",
+    "db:migrate": "pnpm --filter @cybernexus/api prisma:migrate"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  }
+}

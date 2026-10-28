@@ -1,0 +1,31 @@
+[
+  {
+    "source": "demo-idp",
+    "externalId": "demo-alert-001",
+    "observedAt": "2026-10-28T08:15:00Z",
+    "title": "Repeated failed sign-ins followed by a successful login",
+    "severity": "high",
+    "payload": {
+      "eventType": "authentication",
+      "userId": "analyst-demo@example.test",
+      "sourceIp": "198.51.100.44",
+      "failedAttempts": 8,
+      "result": "success",
+      "synthetic": true
+    }
+  },
+  {
+    "source": "demo-edr",
+    "externalId": "demo-alert-002",
+    "observedAt": "2026-10-28T08:19:00Z",
+    "title": "Unusual script interpreter launched by a document reader",
+    "severity": "medium",
+    "payload": {
+      "eventType": "process-start",
+      "hostId": "demo-workstation-07",
+      "image": "powershell.exe",
+      "parentImage": "reader.exe",
+      "synthetic": true
+    }
+  }
+]
