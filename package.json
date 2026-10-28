@@ -5,16 +5,22 @@
   "packageManager": "pnpm@11.25.0",
   "scripts": {
     "dev": "pnpm --filter @cybernexus/shared build && pnpm --parallel --filter @cybernexus/web --filter @cybernexus/api dev",
+    "lint": "eslint apps packages --max-warnings 0",
+    "check:env": "node scripts/check-env-files.mjs",
+    "check:workspace": "pnpm install --frozen-lockfile --lockfile-only --offline",
     "build": "pnpm --filter @cybernexus/shared build && pnpm --filter @cybernexus/web build && pnpm --filter @cybernexus/api build",
     "typecheck": "pnpm --filter @cybernexus/shared build && pnpm --filter @cybernexus/shared typecheck && pnpm --filter @cybernexus/web typecheck && pnpm --filter @cybernexus/api typecheck",
     "test": "pnpm --filter @cybernexus/shared build && pnpm --filter @cybernexus/shared test && pnpm --filter @cybernexus/api test && pnpm --filter @cybernexus/web test",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "prettier --write --ignore-path .gitignore --ignore-path .prettierignore .",
+    "format:check": "prettier --check --ignore-path .gitignore --ignore-path .prettierignore .",
     "db:generate": "pnpm --filter @cybernexus/api prisma:generate",
     "db:migrate": "pnpm --filter @cybernexus/api prisma:migrate"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
     "prettier": "^3.6.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.1"
   }
 }

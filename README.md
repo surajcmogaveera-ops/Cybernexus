@@ -1,22 +1,23 @@
 # CyberNexus
 
-CyberNexus is an AI-assisted SOC prototype for explainable incident triage and qualified analyst assignment. This repository is the Phase 1 monorepo scaffold; it contains no incident processing or external AI integration yet.
+CyberNexus is an AI-assisted SOC prototype for explainable incident triage and qualified analyst assignment. The current application is a local health-check scaffold; it does not yet ingest alerts or provide incident workflows.
 
 ## Prerequisites
 
-- Node.js 22 or newer and pnpm 10 or newer
-- Python 3.11 or newer and `pip` (or `uv`) for the AI service
-- PostgreSQL 16 or newer for later database-backed phases
-
-The React application and initial API checks do not require a running PostgreSQL instance.
+- Node.js 22 or newer
+- pnpm 11.25.0 (the repository's pinned version)
+- Python 3.11 or newer for the AI service
+- PostgreSQL 16 or newer is intended for later database-backed phases; it is not required by the current health-check scaffold
 
 ## Install
 
+From the repository root, install the JavaScript workspace from its lockfile:
+
 ```sh
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
-Copy `.env.example` to `.env` (`Copy-Item .env.example .env` in PowerShell, `cp .env.example .env` on macOS/Linux). Then create the Python environment and install its dependencies:
+Set up the AI service environment once:
 
 ```powershell
 py -m venv services/ai/.venv
@@ -28,35 +29,53 @@ python3 -m venv services/ai/.venv
 services/ai/.venv/bin/python -m pip install -e "services/ai[dev]"
 ```
 
-## Develop
+Copy `.env.example` to `.env` only if you need to customize local settings (`Copy-Item .env.example .env` in PowerShell or `cp .env.example .env` on macOS/Linux). A `.env` file is optional for the current health-only startup. `API_PORT` defaults to `3001`, and `WEB_ORIGIN` defaults to `http://127.0.0.1:5173`; set them only when changing those local endpoints. `DATABASE_URL` is needed only for later Prisma/database operations, which are not part of the current health checks. `AI_SERVICE_URL` and the blank QpiAI key placeholders are unused by the scaffold; no external integration is configured. Never put real secrets in `.env.example` or frontend variables.
+
+## Develop locally
+
+Start the React/Vite web app and Express API together:
 
 ```sh
-pnpm dev                 # web :5173 and API :3001
+pnpm dev
 ```
 
-Run the AI service in a second terminal:
+In a second terminal, start FastAPI with the project virtual environment:
 
 ```powershell
-.\services\ai\.venv\Scripts\python.exe -m uvicorn cybernexus_ai.main:app --reload --port 8000 --app-dir services/ai/src
+.\services\ai\.venv\Scripts\python.exe -m uvicorn cybernexus_ai.main:app --reload --host 127.0.0.1 --port 8000 --app-dir services/ai/src
 ```
 
 ```sh
-services/ai/.venv/bin/python -m uvicorn cybernexus_ai.main:app --reload --port 8000 --app-dir services/ai/src
+services/ai/.venv/bin/python -m uvicorn cybernexus_ai.main:app --reload --host 127.0.0.1 --port 8000 --app-dir services/ai/src
 ```
 
-The API health endpoint is `GET http://localhost:3001/health`; the internal AI service exposes `GET http://127.0.0.1:8000/health`.
+The development servers use these local addresses:
 
-## Build and checks
+- Web: `http://127.0.0.1:5173`
+- Express health: `http://127.0.0.1:3001/health`
+- Vite proxy to Express: `http://127.0.0.1:5173/api/health`
+- FastAPI health: `http://127.0.0.1:8000/health`
+
+The Vite `/api` proxy forwards to Express on port 3001. To stop a service, press `Ctrl+C` in the terminal running it. The current API and AI services expose health checks only; successful startup does not verify PostgreSQL or external providers.
+
+## Checks
 
 ```sh
-pnpm build
+pnpm check:workspace   # offline, frozen lockfile/workspace consistency; does not install packages
+pnpm check:env          # rejects tracked .env files; .env.example is allowed
+pnpm lint
+pnpm format:check
 pnpm typecheck
 pnpm test
-pnpm format:check
+pnpm build
 ```
 
-Run the Python tests with `services/ai/.venv/bin/python -m pytest` on macOS/Linux or `services\ai\.venv\Scripts\python.exe -m pytest` in PowerShell.
+Run the Python tests with the project environment:
 
-## Environment variables
+```powershell
+.\services\ai\.venv\Scripts\python.exe -m pytest -q services\ai\tests
+```
 
-Copy `.env.example` to `.env`. `DATABASE_URL` is the PostgreSQL connection string used by Prisma when database work is introduced. `API_PORT`, `WEB_ORIGIN`, and `AI_SERVICE_URL` configure the local services. The QpiAI key variables are blank placeholders; no QpiAI integration is connected. Never put secrets in frontend variables or commit `.env`.
+```sh
+services/ai/.venv/bin/python -m pytest -q services/ai/tests
+```
