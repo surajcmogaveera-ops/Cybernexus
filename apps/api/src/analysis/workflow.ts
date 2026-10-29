@@ -14,6 +14,7 @@ import {
   type StoredIncidentAnalysis,
 } from './contracts.js';
 import { validateIncidentAnalysisEvidence } from './evidence-validation.js';
+import { createDeterministicFallback } from './deterministic-fallback.js';
 import {
   AnalysisServiceUnavailable,
   InvalidAnalysisServiceResponse,
@@ -70,11 +71,17 @@ export async function runIncidentAnalysis(
   });
 
   let rawResult: IncidentAnalysisResult;
+  let fallbackReason: 'analysis_service_unavailable' | undefined;
   try {
     rawResult = await service.analyze(request);
   } catch (error) {
-    await writeAnalysisFailureAudit(database, requestId, actorId, error);
-    throw error;
+    if (error instanceof AnalysisServiceUnavailable) {
+      rawResult = createDeterministicFallback(request);
+      fallbackReason = 'analysis_service_unavailable';
+    } else {
+      await writeAnalysisFailureAudit(database, requestId, actorId, error);
+      throw error;
+    }
   }
 
   let validated: ReturnType<typeof validateIncidentAnalysisEvidence>;
@@ -165,6 +172,7 @@ export async function runIncidentAnalysis(
       metadata: {
         incidentId: incident.id,
         analysisMethod: result.analysisMethod,
+        ...(fallbackReason ? { fallbackReason } : {}),
         validationStatus: validated.validationStatus,
         sourceAlertCount: alertIds.length,
         sourceRelationshipCount: relationships.length,

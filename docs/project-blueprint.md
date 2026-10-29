@@ -21,6 +21,7 @@ The product must help SOC analysts understand why alerts were grouped, what evid
 - [`prioritization-sla-audit.md`](prioritization-sla-audit.md) records the canonical Phase 14 risk/SLA policy, response recommendations, and audit limits.
 - [`assignment-optimization.md`](assignment-optimization.md) records revised Phase 15, which consolidates the original 20-phase roadmap's assignment baseline, QpiAI Opt, and alternative AI workflow items (old Phases 15–17).
 - [`connected-soc-dashboard.md`](connected-soc-dashboard.md) records revised Phase 16's Express-backed dashboard integration and remaining status/evaluation/database limits.
+- [`gemini-provider-integration.md`](gemini-provider-integration.md) records the mocked Gemini adapter verification, Express outage fallback, configuration boundaries, and live-call limitations.
 
 ## Product capabilities
 

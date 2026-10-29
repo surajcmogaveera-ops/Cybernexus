@@ -11,7 +11,10 @@ import {
   IncidentAnalysisRequestSchema,
 } from '@cybernexus/shared';
 import { createApp } from '../app.js';
-import { createIncidentAnalysisServiceClient } from '../analysis/service-client.js';
+import {
+  createAIServiceReadinessClient,
+  createIncidentAnalysisServiceClient,
+} from '../analysis/service-client.js';
 import { createCorrelationServiceClient } from '../correlation/service-client.js';
 
 const correlationFixture = JSON.parse(
@@ -188,6 +191,21 @@ describe('real Express-to-FastAPI HTTP boundary', () => {
         ),
     ).toBe(true);
     expect(result.missingInformation.length).toBeGreaterThan(0);
+  });
+
+  it('checks authenticated FastAPI readiness without making a provider request', async () => {
+    await expect(
+      createAIServiceReadinessClient({
+        baseUrl: fastApiUrl,
+        token: serviceToken,
+      }).check(),
+    ).resolves.toEqual({
+      status: 'ok',
+      service: 'cybernexus-ai',
+      analysisMode: 'deterministic',
+      geminiConfiguration: 'disabled',
+      geminiConnectivity: 'disabled',
+    });
   });
 
   it('rejects missing internal credentials and keeps public API auth in Express', async () => {

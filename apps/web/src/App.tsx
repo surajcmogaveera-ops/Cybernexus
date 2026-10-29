@@ -19,6 +19,12 @@ import {
 } from './api.js';
 import ConnectedDashboard from './ConnectedDashboard.js';
 import {
+  toHealthIndicators,
+  useDependencyHealth,
+  type HealthIndicatorState,
+  type HealthIndicators,
+} from './use-dependency-health.js';
+import {
   demoDashboardData,
   filterIncidents,
   getAlertSeverityCounts,
@@ -45,7 +51,7 @@ const navigation = [
 ] as const;
 
 type PageId = DashboardPage;
-type HealthState = 'checking' | 'healthy' | 'unavailable' | 'unknown';
+type HealthState = HealthIndicatorState;
 
 const severityClass: Record<string, string> = {
   critical: 'border-rose-400/25 bg-rose-400/10 text-rose-300',
@@ -276,31 +282,6 @@ function IncidentTable({
   );
 }
 
-function useServiceHealth() {
-  const [api, setApi] = useState<HealthState>('checking');
-  useEffect(() => {
-    let active = true;
-    const check = async () => {
-      try {
-        await getApiHealth(fetch, 3500);
-        if (active) setApi('healthy');
-      } catch {
-        if (active) setApi('unavailable');
-      }
-    };
-    void check();
-    return () => {
-      active = false;
-    };
-  }, []);
-  return {
-    api,
-    database: 'unknown' as const,
-    aiService: 'unknown' as const,
-    geminiProvider: 'unknown' as const,
-  };
-}
-
 function usePrefersReducedMotion() {
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -376,7 +357,7 @@ function useCountUp(value: number) {
   return displayValue;
 }
 
-function DemoWorkspace() {
+function DemoWorkspace({ health }: { health: HealthIndicators }) {
   usePageVisibilityMotion();
   const [view, dispatch] = useReducer(dashboardViewReducer, {
     page: 'overview',
@@ -386,7 +367,6 @@ function DemoWorkspace() {
   const [query, setQuery] = useState('');
   const [severity, setSeverity] = useState('all');
   const [status, setStatus] = useState('all');
-  const health = useServiceHealth();
   const selectedIncident =
     demoDashboardData.incidents.find((item) => item.id === selectedId) ??
     demoDashboardData.incidents[0]!;
@@ -616,6 +596,8 @@ function DemoWorkspace() {
 }
 
 export default function App() {
+  const dependencyHealth = useDependencyHealth();
+  const health = toHealthIndicators(dependencyHealth);
   const [apiToken, setApiToken] = useState('');
   const [connected, setConnected] = useState<ConnectedDashboardData>();
   const [expressHealthy, setExpressHealthy] = useState(false);
@@ -656,6 +638,7 @@ export default function App() {
         token={apiToken.trim()}
         data={connected}
         expressHealthy={expressHealthy}
+        dependencyHealth={health}
         onDisconnect={() => {
           setConnected(undefined);
           setApiToken('');
@@ -716,7 +699,7 @@ export default function App() {
           </p>
         )}
       </section>
-      <DemoWorkspace />
+      <DemoWorkspace health={health} />
     </>
   );
 }
@@ -755,7 +738,7 @@ function Overview({
   metrics: ReturnType<typeof getDashboardMetrics>;
   onSelect: (id: string) => void;
   setPage: (page: PageId) => void;
-  health: ReturnType<typeof useServiceHealth>;
+  health: HealthIndicators;
 }) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [activeSeverityIndex, setActiveSeverityIndex] = useState<number>();
@@ -767,10 +750,10 @@ function Overview({
   );
   const apiHealthDetail =
     health.api === 'checking'
-      ? 'Checking GET /api/health…'
+      ? 'Checking service dependencies…'
       : health.api === 'healthy'
-        ? 'GET /api/health responded successfully'
-        : 'GET /api/health failed or timed out';
+        ? `Dependency check responded${health.checkedAt ? ` at ${formatTime(health.checkedAt)} UTC` : ''}`
+        : 'Dependency check failed or timed out';
   const riskItems = incidents.filter(
     (incident) =>
       !['resolved', 'closed'].includes(incident.status) &&
@@ -1107,18 +1090,18 @@ function Overview({
           />
           <ServiceCard
             name="PostgreSQL"
-            state="unknown"
-            detail="API liveness does not check database readiness"
+            state={health.database}
+            detail="Read-only database connectivity check"
           />
           <ServiceCard
             name="AI service"
             state={health.aiService}
-            detail="Private FastAPI service; the dashboard only probes Express."
+            detail="Authenticated private FastAPI readiness check"
           />
           <ServiceCard
             name="Gemini provider"
             state={health.geminiProvider}
-            detail="Server-side provider; this dashboard does not test Gemini connectivity."
+            detail={`Configuration only; connectivity ${health.geminiConnectivity.replaceAll('_', ' ')}.`}
           />
         </div>
       </Panel>
@@ -1792,7 +1775,7 @@ function HealthRow({ name, state }: { name: string; state: HealthState }) {
       <span className="text-slate-400">{name}</span>
       <span className="flex items-center gap-1.5 capitalize text-slate-500">
         <HealthDot state={state} />
-        {state.replace('-', ' ')}
+        {state.replaceAll('_', ' ').replace('-', ' ')}
       </span>
     </div>
   );
@@ -1812,7 +1795,7 @@ function ServiceCard({
         <span className="text-xs font-medium text-slate-200">{name}</span>
         <span className="flex items-center gap-2 text-[10px] capitalize text-slate-400">
           <HealthDot state={state} />
-          {state.replace('-', ' ')}
+          {state.replaceAll('_', ' ').replace('-', ' ')}
         </span>
       </div>
       <p className="mt-2 text-[10px] leading-4 text-slate-600">{detail}</p>

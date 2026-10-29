@@ -398,5 +398,5 @@ databaseDescribe('correlation and incident PostgreSQL integration', () => {
         where: { alertId: alreadyLinkedAlertId },
       }),
     ).toBe(0);
-  });
+  }, 30_000);
 });

@@ -4,6 +4,7 @@ import {
   ApiErrorResponseSchema,
   ApiSessionResponseSchema,
   AssignmentSchema,
+  DependencyHealthResponseSchema,
   HealthResponseSchema,
   IncidentAnalysisMethodSchema,
   IncidentAuditHistoryResponseSchema,
@@ -14,6 +15,7 @@ import {
   SecurityAlertSchema,
   type ApiSessionResponse,
   type Assignment,
+  type DependencyHealthResponse,
   type HealthResponse,
   type Incident,
   type IncidentAuditHistoryResponse,
@@ -228,6 +230,23 @@ export async function getApiHealth(
       );
     }
     return HealthResponseSchema.parse(body);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function getDependencyHealth(
+  fetcher: typeof fetch = fetch,
+  timeoutMs = 4_000,
+): Promise<DependencyHealthResponse> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetcher('/api/health/dependencies', {
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error('Dependency health is unavailable.');
+    return DependencyHealthResponseSchema.parse(await response.json());
   } finally {
     clearTimeout(timeout);
   }

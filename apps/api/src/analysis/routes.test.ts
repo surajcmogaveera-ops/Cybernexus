@@ -1,7 +1,15 @@
 import { readFileSync } from 'node:fs';
 import type { PrismaClient } from '@prisma/client';
 import type { Server } from 'node:http';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import type { IncidentAnalysisResult } from '@cybernexus/shared';
 import { createApp } from '../app.js';
 import { AnalysisServiceUnavailable } from './service-client.js';
@@ -26,14 +34,34 @@ function databaseStub(incident: unknown) {
     id: incidentId,
     ...(data as object),
   }));
+  const analysisRunCreate = vi.fn(
+    async ({ data }: { data: Record<string, unknown> }) => ({
+      ...data,
+      requestedAt: new Date('2026-10-28T08:15:00.000Z'),
+      findings: (
+        (data.findings as { create: Record<string, unknown>[] })?.create ?? []
+      ).map((finding) => ({
+        ...finding,
+        evidence: (finding.evidence as { create: unknown[] })?.create ?? [],
+      })),
+      alerts: (data.alerts as { create: unknown[] })?.create ?? [],
+      evidence: (data.evidence as { create: unknown[] })?.create ?? [],
+    }),
+  );
   const database = {
     incident: { findUnique: vi.fn(async () => incident) },
     alertRelationship: { findMany: vi.fn(async () => []) },
-    analysisRun: { create: vi.fn(), findFirst: vi.fn(async () => null) },
+    analysisRun: {
+      create: analysisRunCreate,
+      findFirst: vi.fn(async () => null),
+    },
     auditEvent: { create: auditCreate },
     $transaction: vi.fn(
       async (callback: (transaction: unknown) => Promise<unknown>) =>
-        callback({ auditEvent: { create: auditCreate } }),
+        callback({
+          analysisRun: { create: analysisRunCreate },
+          auditEvent: { create: auditCreate },
+        }),
     ),
   } as unknown as PrismaClient;
   return { database, auditCreate };
@@ -68,6 +96,8 @@ describe('incident analysis public API', () => {
   let database: PrismaClient;
   let auditCreate: ReturnType<typeof vi.fn>;
   let service: { analyze: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => vi.clearAllMocks());
 
   beforeAll(async () => {
     const stub = databaseStub(incidentWithAlert());
@@ -205,7 +235,7 @@ describe('incident analysis public API', () => {
     }
   });
 
-  it('returns safe service errors and records the failure without persisting analysis', async () => {
+  it('stores a labeled deterministic fallback when the private service is unavailable', async () => {
     service.analyze.mockRejectedValue(new AnalysisServiceUnavailable());
     const response = await fetch(baseUrl, {
       method: 'POST',
@@ -215,16 +245,23 @@ describe('incident analysis public API', () => {
       },
       body: '{}',
     });
-    expect(response.status).toBe(503);
-    expect(await response.text()).not.toContain('private');
-    expect(
-      database.analysisRun.create as ReturnType<typeof vi.fn>,
-    ).not.toHaveBeenCalled();
+    const responseBody = await response.text();
+    expect(response.status, responseBody).toBe(201);
+    expect(JSON.parse(responseBody)).toMatchObject({
+      analysis: {
+        analysisMethod: 'deterministic_fallback',
+        semanticVerification: 'not_performed',
+        needsHumanReview: true,
+      },
+    });
     expect(auditCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          eventType: 'incident.analysis.failed',
-          metadata: { failureClass: 'service_unavailable' },
+          eventType: 'incident.analysis.completed',
+          metadata: expect.objectContaining({
+            analysisMethod: 'deterministic_fallback',
+            fallbackReason: 'analysis_service_unavailable',
+          }),
         }),
       }),
     );

@@ -1,13 +1,16 @@
 import {
+  AIServiceReadinessResponseSchema,
   IncidentAnalysisRequestSchema,
   IncidentAnalysisResultSchema,
   type IncidentAnalysisRequest,
   type IncidentAnalysisResult,
 } from '@cybernexus/shared';
+import { isValidInternalServiceToken } from '../security/internal-service-token.js';
 
 const MAX_ANALYSIS_SERVICE_BYTES = 1_048_576;
 const ANALYSIS_SERVICE_TIMEOUT_MS = 3_000;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+const AI_READINESS_TIMEOUT_MS = 1_500;
 
 export class AnalysisServiceUnavailable extends Error {
   constructor() {
@@ -20,6 +23,20 @@ export class InvalidAnalysisServiceResponse extends Error {
   constructor() {
     super('Analysis service returned an invalid response.');
     this.name = 'InvalidAnalysisServiceResponse';
+  }
+}
+
+export class AIServiceNotConfigured extends Error {
+  constructor() {
+    super('Analysis service configuration is missing or invalid.');
+    this.name = 'AIServiceNotConfigured';
+  }
+}
+
+export class AIServiceReadinessUnavailable extends Error {
+  constructor() {
+    super('Analysis service readiness could not be verified.');
+    this.name = 'AIServiceReadinessUnavailable';
   }
 }
 
@@ -43,7 +60,7 @@ export function createIncidentAnalysisServiceClient(
   return {
     async analyze(rawRequest) {
       const request = IncidentAnalysisRequestSchema.parse(rawRequest);
-      if (!baseUrl || !token || token.length < 32 || token.length > 512) {
+      if (!baseUrl || !token || !isValidInternalServiceToken(token)) {
         throw new AnalysisServiceUnavailable();
       }
 
@@ -97,6 +114,58 @@ export function createIncidentAnalysisServiceClient(
         return result;
       } catch {
         throw new InvalidAnalysisServiceResponse();
+      }
+    },
+  };
+}
+
+export type AIServiceReadinessClient = {
+  check(): Promise<ReturnType<typeof AIServiceReadinessResponseSchema.parse>>;
+};
+
+export function createAIServiceReadinessClient(
+  options: IncidentAnalysisServiceOptions = {},
+): AIServiceReadinessClient {
+  const baseUrl = options.baseUrl ?? process.env.AI_SERVICE_URL;
+  const token = options.token ?? process.env.CYBERNEXUS_AI_SERVICE_TOKEN;
+  const fetchImplementation = options.fetchImplementation ?? fetch;
+
+  return {
+    async check() {
+      if (!baseUrl || !token || !isValidInternalServiceToken(token)) {
+        throw new AIServiceNotConfigured();
+      }
+
+      let endpoint: URL;
+      try {
+        const parsedBase = new URL(baseUrl);
+        const loopback = LOOPBACK_HOSTS.has(parsedBase.hostname.toLowerCase());
+        if (
+          !['http:', 'https:'].includes(parsedBase.protocol) ||
+          parsedBase.username ||
+          parsedBase.password ||
+          parsedBase.search ||
+          parsedBase.hash ||
+          (parsedBase.protocol === 'http:' && !loopback)
+        ) {
+          throw new Error('Invalid private analysis service origin.');
+        }
+        endpoint = new URL('/internal/v1/health', parsedBase);
+      } catch {
+        throw new AIServiceNotConfigured();
+      }
+
+      try {
+        const response = await fetchImplementation(endpoint, {
+          method: 'GET',
+          headers: { authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(AI_READINESS_TIMEOUT_MS),
+        });
+        if (!response.ok) throw new AIServiceReadinessUnavailable();
+        const body = await readBoundedJson(response);
+        return AIServiceReadinessResponseSchema.parse(body);
+      } catch {
+        throw new AIServiceReadinessUnavailable();
       }
     },
   };

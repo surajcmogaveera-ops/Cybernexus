@@ -5,6 +5,10 @@ import {
   type ConnectedDashboardData,
   type IncidentWorkspaceData,
 } from './api.js';
+import type {
+  HealthIndicatorState,
+  HealthIndicators,
+} from './use-dependency-health.js';
 
 type Page =
   | 'overview'
@@ -18,6 +22,7 @@ type Props = {
   token: string;
   data: ConnectedDashboardData;
   expressHealthy: boolean;
+  dependencyHealth: HealthIndicators;
   onDisconnect: () => void;
 };
 
@@ -39,6 +44,10 @@ function record(value: unknown): Record<string, unknown> {
 
 function str(value: unknown, fallback = 'Unavailable'): string {
   return typeof value === 'string' && value.length ? value : fallback;
+}
+
+function healthLabel(value: HealthIndicatorState): string {
+  return value.replaceAll('_', ' ');
 }
 
 function items(value: unknown): Record<string, unknown>[] {
@@ -86,6 +95,7 @@ export default function ConnectedDashboard({
   token,
   data,
   expressHealthy,
+  dependencyHealth,
   onDisconnect,
 }: Props) {
   const [page, setPage] = useState<Page>('overview');
@@ -182,26 +192,35 @@ export default function ConnectedDashboard({
           </button>
         </header>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <Status
             label="Express API"
-            value={expressHealthy ? 'Healthy' : 'Unavailable'}
-            detail="Public Express health endpoint was checked independently."
+            value={healthLabel(dependencyHealth.api)}
+            detail={
+              expressHealthy
+                ? 'Express dependency-health endpoint responded.'
+                : 'Express health endpoint is unavailable.'
+            }
+          />
+          <Status
+            label="PostgreSQL"
+            value={healthLabel(dependencyHealth.database)}
+            detail="Read-only database connectivity check."
           />
           <Status
             label="FastAPI service"
-            value="Unknown"
-            detail="Private service health is not exposed through the dashboard API."
+            value={healthLabel(dependencyHealth.aiService)}
+            detail="Authenticated private readiness check."
           />
           <Status
             label="Gemini configuration"
-            value="Unknown"
-            detail="Server-side provider settings are not returned to the browser."
+            value={healthLabel(dependencyHealth.geminiProvider)}
+            detail="Configuration status only; credentials are never returned."
           />
           <Status
             label="Gemini connectivity"
-            value="Not verified"
-            detail="No provider request was made; API health does not verify Gemini."
+            value={healthLabel(dependencyHealth.geminiConnectivity)}
+            detail="No Gemini connectivity request is made by health checks."
           />
         </div>
 

@@ -42,7 +42,7 @@ def analyze_incident(request: IncidentAnalysisRequest) -> IncidentAnalysisResult
             id=alert.id,
             fieldPaths=["severity", "observedAt"],
         )
-        for alert in alerts
+        for alert in alerts[:20]
     ]
     total_records = len(alerts) + len(relationships)
     findings = [
@@ -56,7 +56,7 @@ def analyze_incident(request: IncidentAnalysisRequest) -> IncidentAnalysisResult
                 "It does not establish alert accuracy, intent, or causation."
             ),
             evidence=alert_evidence,
-            confidence=len(alerts) / total_records,
+            confidence=len(alert_evidence) / total_records,
             uncertainty=(
                 "Source payloads and alert titles were not interpreted by this "
                 "deterministic fallback."
@@ -71,7 +71,7 @@ def analyze_incident(request: IncidentAnalysisRequest) -> IncidentAnalysisResult
             id=relationship.id,
             fieldPaths=["status", "relationshipType", "confidence"],
         )
-        for relationship in relationships
+        for relationship in relationships[:20]
     ]
     if relationships:
         needs_review = sum(
@@ -92,7 +92,7 @@ def analyze_incident(request: IncidentAnalysisRequest) -> IncidentAnalysisResult
                     "They do not confirm an attack path or causal connection."
                 ),
                 evidence=relationship_evidence,
-                confidence=len(relationships) / total_records,
+                confidence=len(relationship_evidence) / total_records,
                 uncertainty=(
                     "The fallback does not independently resolve or semantically "
                     "verify relationship explanations."
@@ -102,7 +102,7 @@ def analyze_incident(request: IncidentAnalysisRequest) -> IncidentAnalysisResult
         )
 
     cited_record_ids = {
-        evidence.id
+        (evidence.kind, evidence.id)
         for finding in findings
         for evidence in finding.evidence
     }

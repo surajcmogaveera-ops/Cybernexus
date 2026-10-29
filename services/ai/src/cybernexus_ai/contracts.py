@@ -351,3 +351,13 @@ class CorrelationResult(StrictModel):
 class HealthResponse(StrictModel):
     status: Literal["ok"]
     service: Annotated[str, StringConstraints(min_length=1, max_length=120, strip_whitespace=True)]
+
+
+class AIServiceReadinessResponse(StrictModel):
+    status: Literal["ok"]
+    service: Literal["cybernexus-ai"]
+    analysisMode: Literal["deterministic", "gemini"]
+    geminiConfiguration: Literal[
+        "disabled", "not_configured", "configured_unverified"
+    ]
+    geminiConnectivity: Literal["disabled", "unverified"]

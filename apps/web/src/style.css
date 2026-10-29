@@ -663,6 +663,13 @@ textarea,
   background: #94a39a;
 }
 
+.health-dot.state-disabled,
+.health-dot.state-unverified,
+.health-dot.state-configured_unverified,
+.health-dot.state-not_configured {
+  background: #748179;
+}
+
 .health-dot.state-not-connected {
   background: #64756a;
   box-shadow: inset 0 0 0 1px rgb(203 213 225 / 18%);

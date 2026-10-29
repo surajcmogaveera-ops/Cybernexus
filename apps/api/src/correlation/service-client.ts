@@ -4,6 +4,7 @@ import {
   type CorrelationRequest,
   type CorrelationResult,
 } from '@cybernexus/shared';
+import { isValidInternalServiceToken } from '../security/internal-service-token.js';
 
 const MAX_SERVICE_RESPONSE_BYTES = 1_048_576;
 const SERVICE_TIMEOUT_MS = 3_000;
@@ -36,7 +37,7 @@ export function createCorrelationServiceClient(
   return {
     async correlate(rawRequest) {
       const request = CorrelationRequestSchema.parse(rawRequest);
-      if (!baseUrl || !token || token.length < 32 || token.length > 512) {
+      if (!baseUrl || !token || !isValidInternalServiceToken(token)) {
         throw new CorrelationServiceUnavailable();
       }
 

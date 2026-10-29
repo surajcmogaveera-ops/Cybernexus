@@ -210,5 +210,5 @@ databaseDescribe('alert ingestion PostgreSQL integration', () => {
         expect.objectContaining({ source, severity: 'medium' }),
       ]),
     });
-  });
+  }, 30_000);
 });

@@ -1,8 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import App from './App';
-import { getApiHealth } from './api.js';
+import { getApiHealth, getDependencyHealth } from './api.js';
 import ConnectedDashboard from './ConnectedDashboard.js';
+import type { HealthIndicators } from './use-dependency-health.js';
+
+const health: HealthIndicators = {
+  api: 'healthy',
+  database: 'unknown',
+  aiService: 'unknown',
+  geminiProvider: 'disabled',
+  geminiConnectivity: 'unverified',
+};
 
 describe('CyberNexus dashboard', () => {
   it('renders the dashboard navigation and synthetic data label', () => {
@@ -17,13 +26,9 @@ describe('CyberNexus dashboard', () => {
     const markup = renderToStaticMarkup(<App />);
     expect(markup).toContain('AI service');
     expect(markup).toContain('Gemini provider');
-    expect(markup).toContain(
-      'Private FastAPI service; the dashboard only probes Express.',
-    );
-    expect(markup).toContain(
-      'Server-side provider; this dashboard does not test Gemini connectivity.',
-    );
-    expect(markup.toLowerCase()).not.toContain('not connected');
+    expect(markup).toContain('Configuration only; connectivity unverified.');
+    expect(markup).toContain('unverified');
+    expect(markup).not.toContain('connected to Gemini');
   });
 
   it('validates the shared health response contract', async () => {
@@ -40,6 +45,35 @@ describe('CyberNexus dashboard', () => {
       status: 'ok',
       service: 'cybernexus-api',
     });
+  });
+
+  it('loads separate database, AI-service, and unverified Gemini status', async () => {
+    const fetcher = vi.fn().mockResolvedValue(
+      Response.json({
+        checkedAt: '2026-10-29T10:00:00Z',
+        api: { status: 'healthy', verified: true },
+        database: { status: 'healthy', verified: true },
+        aiService: { status: 'healthy', verified: true },
+        aiProvider: {
+          analysisMode: 'deterministic',
+          geminiConfiguration: 'disabled',
+          geminiConnectivity: 'disabled',
+          verified: false,
+        },
+      }),
+    );
+
+    await expect(getDependencyHealth(fetcher)).resolves.toMatchObject({
+      database: { status: 'healthy', verified: true },
+      aiService: { status: 'healthy', verified: true },
+      aiProvider: {
+        analysisMode: 'deterministic',
+        geminiConfiguration: 'disabled',
+        geminiConnectivity: 'disabled',
+        verified: false,
+      },
+    });
+    expect(String(fetcher.mock.calls[0]?.[0])).toBe('/api/health/dependencies');
   });
 
   it('uses the standard API error message on failed health requests', async () => {
@@ -82,6 +116,7 @@ describe('CyberNexus dashboard', () => {
       <ConnectedDashboard
         token="test-token"
         expressHealthy
+        dependencyHealth={health}
         onDisconnect={() => undefined}
         data={{
           session: { subject: 'analyst', scopes: ['api:read'] },
@@ -93,12 +128,13 @@ describe('CyberNexus dashboard', () => {
       />,
     );
     expect(markup).toContain('Express API');
-    expect(markup).toContain('Healthy');
+    expect(markup).toContain('healthy');
     expect(markup).toContain('FastAPI service');
-    expect(markup).toContain('Unknown');
+    expect(markup).toContain('unknown');
     expect(markup).toContain('Gemini configuration');
     expect(markup).toContain('Gemini connectivity');
-    expect(markup).toContain('Not verified');
+    expect(markup).toContain('disabled');
+    expect(markup).toContain('unverified');
     expect(markup).toContain('No incidents returned by the API.');
     expect(markup).not.toContain('connected to Gemini');
   });
@@ -108,6 +144,7 @@ describe('CyberNexus dashboard', () => {
       <ConnectedDashboard
         token="test-token"
         expressHealthy
+        dependencyHealth={health}
         onDisconnect={() => undefined}
         data={{
           session: { subject: 'analyst', scopes: ['api:read'] },

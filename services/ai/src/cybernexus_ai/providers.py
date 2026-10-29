@@ -86,6 +86,38 @@ class ProviderSettings:
             and bool(re.fullmatch(r"[A-Za-z0-9._-]{1,100}", self.gemini_model))
         )
 
+    def readiness(self) -> dict[str, str]:
+        """Report safe provider configuration without making an external call."""
+        if self.provider == "deterministic":
+            return {
+                "analysisMode": "deterministic",
+                "geminiConfiguration": "disabled",
+                "geminiConnectivity": "disabled",
+            }
+        if self.provider != "gemini":
+            return {
+                "analysisMode": "deterministic",
+                "geminiConfiguration": "not_configured",
+                "geminiConnectivity": "disabled",
+            }
+        if not self.gemini_live_enabled:
+            return {
+                "analysisMode": "deterministic",
+                "geminiConfiguration": "disabled",
+                "geminiConnectivity": "disabled",
+            }
+        if not self.is_ready():
+            return {
+                "analysisMode": "deterministic",
+                "geminiConfiguration": "not_configured",
+                "geminiConnectivity": "unverified",
+            }
+        return {
+            "analysisMode": "gemini",
+            "geminiConfiguration": "configured_unverified",
+            "geminiConnectivity": "unverified",
+        }
+
 
 def _has_configured_api_key(value: str) -> bool:
     normalized = value.strip().casefold()
@@ -130,7 +162,6 @@ class GeminiIncidentAnalysisProvider:
                         "system_instruction": GEMINI_SYSTEM_INSTRUCTION,
                         "response_mime_type": "application/json",
                         "response_schema": IncidentAnalysisResult,
-                        "temperature": 0,
                         "max_output_tokens": GEMINI_MAX_OUTPUT_TOKENS,
                     },
                 ),

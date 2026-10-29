@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from cybernexus_ai.contracts import (
+    AIServiceReadinessResponse,
     CorrelationRequest,
     CorrelationResult,
     HealthResponse,
@@ -50,6 +51,20 @@ def require_internal_service_token(
     match = re.fullmatch(r"Bearer ([A-Za-z0-9._~+/=-]{32,512})", authorization or "", re.IGNORECASE)
     if not match or not secrets.compare_digest(match.group(1), expected):
         raise HTTPException(status_code=401, detail="Internal authentication required.")
+
+
+@app.get(
+    "/internal/v1/health",
+    response_model=AIServiceReadinessResponse,
+    dependencies=[Depends(require_internal_service_token)],
+)
+def internal_readiness() -> AIServiceReadinessResponse:
+    settings = ProviderSettings.from_environment()
+    return AIServiceReadinessResponse(
+        status="ok",
+        service="cybernexus-ai",
+        **settings.readiness(),
+    )
 
 
 @app.post(

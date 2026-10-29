@@ -30,6 +30,8 @@ import { createIncidentRouter } from './incidents/routes.js';
 import { createIncidentAnalysisRouter } from './analysis/routes.js';
 import {
   createIncidentAnalysisServiceClient,
+  createAIServiceReadinessClient,
+  type AIServiceReadinessClient,
   type IncidentAnalysisService,
 } from './analysis/service-client.js';
 import { createPrioritizationRouter } from './prioritization/routes.js';
@@ -40,6 +42,7 @@ import {
 } from './alerts/repository.js';
 import { prisma } from './db/prisma.js';
 import type { PrismaClient } from '@prisma/client';
+import { getDependencyHealth } from './health/dependencies.js';
 
 export type AppOptions = {
   credentials?: readonly ApiCredential[];
@@ -48,6 +51,7 @@ export type AppOptions = {
   database?: PrismaClient;
   correlationService?: CorrelationService;
   incidentAnalysisService?: IncidentAnalysisService;
+  aiServiceReadiness?: AIServiceReadinessClient;
 };
 
 export function createApp(options: AppOptions = {}): express.Express {
@@ -63,6 +67,8 @@ export function createApp(options: AppOptions = {}): express.Express {
     options.correlationService ?? createCorrelationServiceClient();
   const incidentAnalysisService =
     options.incidentAnalysisService ?? createIncidentAnalysisServiceClient();
+  const aiServiceReadiness =
+    options.aiServiceReadiness ?? createAIServiceReadinessClient();
 
   app.use(requestIdMiddleware);
   app.use(
@@ -84,6 +90,17 @@ export function createApp(options: AppOptions = {}): express.Express {
     response.json(
       HealthResponseSchema.parse({ status: 'ok', service: 'cybernexus-api' }),
     ),
+  );
+  app.get(
+    '/health/dependencies',
+    createRateLimitMiddleware(options.rateLimit),
+    async (_request, response, next) => {
+      try {
+        response.json(await getDependencyHealth(database, aiServiceReadiness));
+      } catch {
+        next(new Error('Dependency health check failed.'));
+      }
+    },
   );
 
   const versionedApi = express.Router();

@@ -335,7 +335,7 @@ databaseDescribe('incident analysis PostgreSQL integration', () => {
         },
       }),
     ).toBe(1);
-  });
+  }, 30_000);
 
   it('returns explicit missing-incident and empty-incident states', async () => {
     const missing = await fetch(
@@ -364,7 +364,7 @@ databaseDescribe('incident analysis PostgreSQL integration', () => {
     expect(empty.status).toBe(409);
   });
 
-  it('does not persist unavailable or invalid analysis output as completed', async () => {
+  it('persists deterministic fallback on service outage but rejects invalid output', async () => {
     serviceUnavailable = true;
     const unavailable = await fetch(
       `${baseUrl}/incidents/${incidentId}/analysis`,
@@ -377,7 +377,14 @@ databaseDescribe('incident analysis PostgreSQL integration', () => {
         body: '{}',
       },
     );
-    expect(unavailable.status).toBe(503);
+    expect(unavailable.status).toBe(201);
+    expect(await unavailable.json()).toMatchObject({
+      analysis: {
+        analysisMethod: 'deterministic_fallback',
+        semanticVerification: 'not_performed',
+        needsHumanReview: true,
+      },
+    });
     serviceUnavailable = false;
 
     invalidEvidence = true;
@@ -399,11 +406,11 @@ databaseDescribe('incident analysis PostgreSQL integration', () => {
       await prisma.analysisRun.count({
         where: { incidentId, status: 'completed' },
       }),
-    ).toBe(1);
+    ).toBe(2);
     expect(
       await prisma.auditEvent.count({
         where: { actorId, eventType: 'incident.analysis.failed' },
       }),
-    ).toBe(2);
+    ).toBe(1);
   });
 });

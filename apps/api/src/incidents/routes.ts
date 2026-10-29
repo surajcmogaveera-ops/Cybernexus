@@ -72,6 +72,9 @@ async function listIncidents(
     return sendValidationError(response, parsed.error.issues);
   try {
     const where: Prisma.IncidentWhereInput = {
+      // Incident response contracts require at least one linked alert. Keep
+      // concurrently-created/incomplete rows from invalidating the list payload.
+      alertLinks: { some: {} },
       ...(parsed.data.status ? { status: parsed.data.status } : {}),
       ...(parsed.data.severity ? { severity: parsed.data.severity } : {}),
     };

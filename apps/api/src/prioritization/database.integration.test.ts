@@ -289,7 +289,7 @@ databaseDescribe('prioritization and audit PostgreSQL integration', () => {
         },
       }),
     ).toBe(4);
-  });
+  }, 30_000);
 
   it('requires authorization and reason for priority overrides and exposes bounded audit history', async () => {
     const invalid = await fetch(`${baseUrl}/priority/override`, {

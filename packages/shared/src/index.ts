@@ -108,6 +108,70 @@ export const HealthResponseSchema = z
   .strict();
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 
+export const AnalysisModeSchema = z.enum(['deterministic', 'gemini']);
+export const GeminiConfigurationStatusSchema = z.enum([
+  'disabled',
+  'not_configured',
+  'configured_unverified',
+]);
+export const GeminiConnectivityStatusSchema = z.enum([
+  'disabled',
+  'unverified',
+]);
+
+/** Private FastAPI readiness contract; it reports configuration, never secrets. */
+export const AIServiceReadinessResponseSchema = z
+  .object({
+    status: z.literal('ok'),
+    service: z.literal('cybernexus-ai'),
+    analysisMode: AnalysisModeSchema,
+    geminiConfiguration: GeminiConfigurationStatusSchema,
+    geminiConnectivity: GeminiConnectivityStatusSchema,
+  })
+  .strict();
+export type AIServiceReadinessResponse = z.infer<
+  typeof AIServiceReadinessResponseSchema
+>;
+
+const DependencyCheckStatusSchema = z.enum([
+  'healthy',
+  'unavailable',
+  'not_configured',
+  'unknown',
+]);
+
+/** Safe public dependency summary. Gemini connectivity is never asserted here. */
+export const DependencyHealthResponseSchema = z
+  .object({
+    checkedAt: UtcTimestampSchema,
+    api: z
+      .object({ status: z.literal('healthy'), verified: z.literal(true) })
+      .strict(),
+    database: z
+      .object({
+        status: z.enum(['healthy', 'unavailable']),
+        verified: z.boolean(),
+      })
+      .strict(),
+    aiService: z
+      .object({ status: DependencyCheckStatusSchema, verified: z.boolean() })
+      .strict(),
+    aiProvider: z
+      .object({
+        analysisMode: AnalysisModeSchema.or(z.literal('unknown')),
+        geminiConfiguration: GeminiConfigurationStatusSchema.or(
+          z.literal('unknown'),
+        ),
+        geminiConnectivity: GeminiConnectivityStatusSchema,
+        verified: z.literal(false),
+      })
+      .strict(),
+  })
+  .strict();
+export type DependencyHealthResponse = z.infer<
+  typeof DependencyHealthResponseSchema
+>;
+
 export const ApiErrorDetailSchema = z
   .object({
     path: z
