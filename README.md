@@ -1,161 +1,274 @@
-CyberNexus
-Explainable, AI-assisted security incident triage for Security Operations Centre (SOC) teams.
+# CyberNexus
 
-CyberNexus is a modular SOC incident-triage platform designed to help analysts make sense of related security alerts, understand why they may belong to the same incident, review evidence-backed analysis, prioritize cases, and distribute work more consistently.
+### An explainable, analyst-led SOC workflow—from alert intake to an auditable response plan.
 
-The project emphasizes explainability, evidence validation, deterministic safety checks, and auditable decisions. It is a development project; features that depend on external services, credentials, or a configured database should not be assumed to be enabled in every environment.
-Contents
-- Problem and approach
-- Key capabilities
-- Architecture
-- Technology stack
-- Repository layout
-- Prerequisites
-- Local setup
-- Configuration and security
-- Testing and quality checks
-- Data and integration status
-- Limitations
-- Project roadmap
-Problem and approach
-SOC teams can receive many alerts from identity systems, endpoints, and cloud environments. Looking at each alert independently can make it harder to recognize a wider incident, validate what the evidence actually supports, and decide which case needs attention first.
+CyberNexus is a security operations center (SOC) prototype for turning synthetic or authorized alerts into traceable incident investigations. It combines deterministic correlation, evidence-scoped AI assistance, transparent prioritization, SLA visibility, and constrained analyst assignment in one workflow.
 
-CyberNexus is being built to support that workflow:
-1. Ingest supported alert records and preserve their original information.
-2. Normalize records into a common representation.
-3. Identify potentially related alerts using explainable correlation signals.
-4. Present incidents with links back to the supporting alerts and evidence.
-5. Generate structured investigation assistance and validate its evidence references.
-6. Prioritize incidents using a documented, reproducible risk and response-deadline policy.
-7. Recommend analyst assignments based on relevant skills, availability, workload, and deadlines.
-8. Record important decisions so analysts can understand what changed and why.
-CyberNexus assists investigation; it does not replace analyst judgment or guarantee that an alert is malicious.
-Key capabilities
-The intended and implemented scope is organized around the following capabilities. Availability depends on the current code, configuration, and whether the required services are running.
-- Alert handling: common alert representation and source-record preservation.
-- Explainable correlation: identify potentially related alerts and expose the signals behind a relationship.
-- Incident management: group related alerts into cases while retaining links to their evidence.
-- AI-assisted investigation: produce structured investigation output through the dedicated AI service when configured.
-- Evidence validation: check that cited evidence references correspond to available records and expose uncertainty rather than treating unsupported claims as facts.
-- Deterministic fallback: retain a non-LLM path for supported analysis behavior when AI-provider use is unavailable or disabled.
-- Risk and SLA prioritization: use documented rules to calculate priority and highlight response-deadline risk.
-- Analyst assignment: provide a baseline assignment plan that accounts for skills, availability, capacity, and deadlines.
-- Assignment explanation: make assignment decisions easier to review.
-- What-if re-optimization: evaluate a proposed assignment change without applying it to the live plan.
-- Audit history: retain traceable records of important workflow decisions.
-- Synthetic data and ground truth: support repeatable development and evaluation without requiring access to a real organization’s security telemetry.
-- Security-focused testing: exercise evidence validation, service boundaries, fallback behavior, and prompt-injection resilience.
-The entity-relationship graph, baseline comparisons, optimization integrations, and other advanced capabilities should be treated as available only to the extent they are present and enabled in the checked-out version.
-Architecture
-┌───────────────────────────────────────────────────────────┐
-│                    React + Vite web app                   │
-│       Dashboard · incidents · analysis · workflows        │
-└─────────────────────────────┬─────────────────────────────┘
-                              │ HTTP API
-┌─────────────────────────────▼─────────────────────────────┐
-│                  Node.js + Express API                    │
-│ Alerts · correlation · incidents · prioritization          │
-│ assignment · audit · auth · database access                │
-└───────────────┬──────────────────────┬────────────────────┘
-                │                      │
-                ▼                      ▼
-┌──────────────────────────┐  ┌────────────────────────────┐
-│ PostgreSQL + Prisma      │  │ Python + FastAPI AI service │
-│ Persistent application   │  │ Structured investigation    │
-│ records and relationships│  │ and provider boundary       │
-└──────────────────────────┘  └────────────────────────────┘
-The Express API is the main application backend. The Python/FastAPI service isolates specialized AI investigation functionality behind a service boundary. PostgreSQL is the relational data store, and Prisma is used for schema and database access. Shared TypeScript contracts help keep interfaces consistent across the monorepo.
+The interface has two honest modes: a clearly labelled synthetic demo workspace, and an authenticated view backed by the CyberNexus Express API. Analysis and assignment suggestions are advisory. Analysts remain responsible for review and consequential decisions.
 
-QpiAI Agent Hive and QpiAI Opt are planned/targeted integrations for workflow orchestration and assignment optimization respectively; do not assume either external integration is active unless it is configured and verified in the current environment.
-Technology stack
-Area	Technology
-Web frontend	React, TypeScript, Vite
-Main API	Node.js, Express, TypeScript
-AI service	Python, FastAPI
-Database	PostgreSQL
-ORM and schema	Prisma
-Monorepo package manager	pnpm
-Shared contracts	TypeScript package
-Tests	Project TypeScript test tooling and Python pytest
+> **Project status:** This is a development prototype, not a production-ready SOC platform. The core workflow and connected dashboard exist, with documented gaps in end-to-end browser validation, evaluation metrics, provider verification, and deployment readiness. The canonical status is in the [implementation plan](docs/implementation-plan.md) and [Phase 17 report](docs/phase-17-final-validation.md).
 
+## Contents
 
-Repository layout
-.
-├── apps/
-│   ├── api/             # Express API, domain services and API tests
-│   └── web/             # React/Vite user interface
-├── packages/
-│   └── shared/          # Shared TypeScript contracts and types
-├── services/
-│   └── ai/              # FastAPI service and Python tests
-├── docs/                # Blueprint, implementation plan and design notes
-├── prisma/              # Root-level Prisma files, if present in this checkout
-├── pnpm-workspace.yaml
-└── package.json
-The exact set of files may evolve as implementation progresses.
-Prerequisites
-Install the versions compatible with the repository's package manifests:
-- Node.js (an active LTS release recommended)
-- pnpm
-- Python 3
-- PostgreSQL for database-backed workflows
-Some checks and workflows may work without every service running; integration tests that require PostgreSQL or the AI service may need additional configuration.
-Local setup
-Run these commands from the repository root in PowerShell or a compatible terminal.
-1. Install JavaScript dependencies
-pnpm install
-2. Configure environment variables
-Create a local .env file only after checking the repository's environment example, configuration loader, and documentation. Use local development values and keep credentials out of Git.
+- [Why CyberNexus](#why-cybernexus)
+- [What works today](#what-works-today)
+- [How the system fits together](#how-the-system-fits-together)
+- [Technology](#technology)
+- [Repository map](#repository-map)
+- [Run it locally](#run-it-locally)
+- [Configuration and security](#configuration-and-security)
+- [Data and integrations](#data-and-integrations)
+- [Verification](#verification)
+- [Known limitations](#known-limitations)
+- [Roadmap and project docs](#roadmap-and-project-docs)
+- [Contributing and license](#contributing-and-license)
 
-At minimum, database-backed workflows need a valid PostgreSQL connection string in the variable expected by the current Prisma/API configuration. Internal service authentication may also be required when the Express API calls the FastAPI service. Use the exact variable names documented by the checked-out code; do not copy placeholder secrets into a shared repository.
-3. Prepare the database
-Review the Prisma schema and available migration scripts before running database commands. Use the migration/deployment command defined by the root package.json and the project's documented development workflow. Do not run destructive database resets against data you need to keep.
-4. Start the services
-Use the scripts defined in the root and workspace package.json files. A typical development workflow starts the API and web app in separate terminals, and starts the FastAPI service when testing AI-assisted investigation.
-pnpm --filter @cybernexus/api dev
-pnpm --filter @cybernexus/web dev
-The exact script names can differ by repository version. Check the package scripts if a command is not defined. Start the Python service using the instructions in services/ai and its package/configuration files.
-Configuration and security
-- Keep .env files, API tokens, database passwords, private keys, and provider credentials out of commits.
-- Check git status, .gitignore, and tracked files before pushing changes. A file already tracked by Git is not made safe merely by adding it to .gitignore.
-- Use scoped, locally generated credentials where the application requires authentication.
-- Keep internal AI-service credentials server-side; do not expose them through frontend environment variables or browser code.
-- Treat alert content and investigation evidence as untrusted input.
-- Validate AI-generated evidence references before displaying findings as supported conclusions.
-- Prefer deterministic policy decisions for risk scoring and assignment constraints; use AI to assist analysis, not to silently override validation or authorization.
-- Use synthetic or explicitly authorized telemetry for development and testing.
-- Do not connect the application to production security systems without appropriate authorization and review.
-Testing and quality checks
-Run the scripts that actually exist in the current checkout. Start by inspecting available scripts:
-pnpm run
-pnpm --filter @cybernexus/api run
-pnpm --filter @cybernexus/web run
-Common checks, when defined by the repository, include:
-pnpm test
-pnpm typecheck
+## Why CyberNexus
+
+Security teams need to move quickly while preserving why an alert became an incident, what evidence supports a conclusion, and who authorized a response. CyberNexus is built around that traceability:
+
+- **Explainable relationships:** correlation records the matching evidence and rationale instead of merging alerts on timestamps alone.
+- **Evidence-scoped investigation:** analysis references records and fields from the incident snapshot. Referential validation is not semantic proof that a claim is true.
+- **Transparent risk and response:** deterministic priority and SLA rules show their inputs and limitations; response steps are suggestions until an authorized human acts.
+- **Constrained assignment:** the application owns qualifications, availability, capacity, application, and audit policy. What-if simulation remains separate from applied assignments.
+- **Honest system state:** demo fixtures are labelled; unavailable records stay unavailable; service health is not presented as model connectivity.
+
+## What works today
+
+“Implemented” describes code and tests in this repository. It does not imply production deployment, a live external provider, or a completed cross-layer browser acceptance run.
+
+| Capability                                | Status                                | What that means                                                                                                                                                                                              |
+| ----------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Synthetic alert fixtures and ground truth | **Implemented**                       | Versioned synthetic records support reproducible development and tests. They are not operational telemetry.                                                                                                  |
+| Alert ingestion and normalization         | **Implemented**                       | Authenticated Express ingest, batch handling, validation, duplicate handling, listing, and audit behavior use the existing API contracts.                                                                    |
+| Explainable correlation and incidents     | **Implemented**                       | The private deterministic analysis service proposes evidence-linked relationships; Express validates and persists eligible incidents. Incident detail, graph, timeline, and status workflows exist.          |
+| AI-assisted investigation                 | **Implemented with limits**           | FastAPI provides deterministic analysis and a mocked-tested Gemini adapter. Evidence references and response shape are checked; claims remain unverified and require human review.                           |
+| Prioritization, SLA and response plans    | **Implemented**                       | Express applies deterministic, documented rules. Suggested response steps are review-required and are not marked performed.                                                                                  |
+| Analyst assignment                        | **Implemented with limits**           | A deterministic, constraint-checked baseline supports recommendations, application, history, and separate what-if simulation. It is not a global optimizer.                                                  |
+| Connected SOC dashboard                   | **Implemented with gaps**             | Authenticated views use supported Express APIs for alerts, incidents, analysis, prioritization/SLA, assignment, timeline, graph, and incident-scoped audit. Missing data is shown as missing or unavailable. |
+| Evaluation metrics                        | **Not available**                     | Synthetic fixtures and ground truth exist, but there is no connected metrics endpoint or validated aggregate model-quality report. The UI does not invent metrics.                                           |
+| Gemini live connectivity                  | **Not verified; disabled by default** | The official Google GenAI SDK adapter is tested with mocks. No live request has been verified; health indicators do not call Gemini.                                                                         |
+| QpiAI Opt / Agent Hive                    | **Not integrated**                    | Opt's current model/job/result interface and usage constraints are unverified. No Agent Hive workflow or orchestration framework is selected.                                                                |
+| Production deployment                     | **Not completed**                     | No external deployment, production secret management, or production readiness approval is claimed.                                                                                                           |
+
+See the [connected dashboard report](docs/connected-soc-dashboard.md), [Gemini integration report](docs/gemini-provider-integration.md), and [assignment integration report](docs/assignment-optimization.md) for evidence and detailed acceptance limits.
+
+## How the system fits together
+
+The browser talks only to the public Express application API. Express owns identity, authorization, business policy, persistence, and audit. FastAPI is an authenticated internal service for specialized analysis; it does not own application persistence or public authorization.
+
+```mermaid
+flowchart LR
+    Analyst[Analyst]
+    Web[React + Vite dashboard]
+    API[Express API<br/>Auth · policy · workflows · audit]
+    DB[(PostgreSQL)]
+    Prisma[Prisma]
+    AI[Private FastAPI service<br/>Pydantic contracts]
+    Deterministic[Deterministic analysis]
+    Gemini[Optional Gemini adapter<br/>server-side, disabled by default]
+
+    Analyst --> Web
+    Web -->|Bearer-authenticated /api/v1| API
+    API --> Prisma --> DB
+    API -->|Internal authenticated v1 contract| AI
+    AI --> Deterministic
+    AI -. explicit server configuration only .-> Gemini
+```
+
+The Gemini branch is not enabled or live-verified in the checked-in configuration. Model output is untrusted input: validated data may inform an advisory analysis, but the model cannot authorize, prioritize, assign, persist, or execute an action.
+
+## Technology
+
+- **Web:** React, TypeScript, Vite, Tailwind CSS, Recharts
+- **Application API:** Node.js, Express, TypeScript, Zod
+- **Analysis service:** Python 3.11+, FastAPI, Pydantic
+- **Persistence:** PostgreSQL through Prisma, with Express as the sole application write owner
+- **Contracts:** versioned JSON contracts shared and validated across TypeScript and Python
+- **Workspace and checks:** pnpm workspaces, Vitest, pytest, TypeScript, ESLint, Prettier
+- **Optional model adapter:** Google's official `google-genai` Python SDK; deterministic mode remains the default
+
+## Repository map
+
+```text
+apps/
+  api/                 Express routes, workflows, authorization, Prisma access and tests
+  web/                 React dashboard, API client/proxy and UI tests
+packages/
+  shared/              Versioned TypeScript contracts and synthetic contract fixtures
+services/
+  ai/                  Private FastAPI analysis/correlation service and pytest suite
+data/
+  demo/                Clearly labelled synthetic demo records
+  synthetic/           Versioned synthetic fixtures and ground truth for tests
+docs/                  Architecture, workflow, phase reports and canonical roadmap
+```
+
+## Run it locally
+
+### Prerequisites
+
+- Node.js 22 or newer
+- pnpm 11.25.0 (pinned by the repository)
+- Python 3.11 or newer for FastAPI
+- PostgreSQL 16 or newer for database-backed API workflows
+
+The synthetic dashboard can be viewed without a database. Persisted workflows require a configured local database and API credentials. Do not point development or test commands at production data.
+
+### Install dependencies
+
+From the repository root:
+
+```sh
+pnpm install --frozen-lockfile
+```
+
+Create the Python environment and install the AI service (PowerShell):
+
+```powershell
+py -m venv services/ai/.venv
+.\services\ai\.venv\Scripts\python.exe -m pip install -e "services/ai[dev]"
+```
+
+macOS/Linux:
+
+```sh
+python3 -m venv services/ai/.venv
+services/ai/.venv/bin/python -m pip install -e "services/ai[dev]"
+```
+
+### Configure local services
+
+Copy templates only when the destination does not already exist; edit ignored local files privately and preserve any existing configuration.
+
+PowerShell:
+
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+if (-not (Test-Path services/ai/.env)) { Copy-Item services/ai/.env.example services/ai/.env }
+```
+
+macOS/Linux:
+
+```sh
+[ -f .env ] || cp .env.example .env
+[ -f services/ai/.env ] || cp services/ai/.env.example services/ai/.env
+```
+
+Set a valid local `DATABASE_URL` only if you intend to use database-backed workflows. Use an isolated local development database. The API bearer credentials are configured server-side as JSON in `CYBERNEXUS_API_TOKENS_JSON`; give each credential only the scopes it needs (`api:read`, `api:write`, and, for audit views, `audit:read`). The dashboard asks the analyst for the bearer token at runtime and holds it in page memory; do not place it in source or a `VITE_` variable.
+
+For FastAPI-backed requests, set a high-entropy `CYBERNEXUS_AI_SERVICE_TOKEN` privately in both the root `.env` and `services/ai/.env`; the values must match. The API also needs `AI_SERVICE_URL` (local default: `http://127.0.0.1:8000`). Keep `AI_PROVIDER=deterministic` and `GEMINI_LIVE_ENABLED=false`. No Gemini key is needed for deterministic analysis.
+
+The Express loader reads the repository-root `.env`. FastAPI does **not** automatically load `services/ai/.env`; pass it using the documented Uvicorn `--env-file` option below. Never copy a real key into a template, browser variable, report, or log.
+
+### Start the app
+
+Terminal 1, from the repository root, starts Vite and Express:
+
+```sh
+pnpm dev
+```
+
+Terminal 2 starts FastAPI. PowerShell:
+
+```powershell
+.\services\ai\.venv\Scripts\python.exe -m uvicorn cybernexus_ai.main:app --reload --host 127.0.0.1 --port 8000 --app-dir services/ai/src --env-file services/ai/.env
+```
+
+macOS/Linux:
+
+```sh
+services/ai/.venv/bin/python -m uvicorn cybernexus_ai.main:app --reload --host 127.0.0.1 --port 8000 --app-dir services/ai/src --env-file services/ai/.env
+```
+
+Open `http://127.0.0.1:5173`. Without connecting an authorized API token, the dashboard uses its labelled synthetic demo workspace. Connected workflows require Express credentials and, where relevant, a reachable database and authenticated FastAPI service.
+
+| Address                                         | What it checks                                               |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| `http://127.0.0.1:5173`                         | Vite web app                                                 |
+| `http://127.0.0.1:5173/api/health`              | Vite proxy to Express liveness                               |
+| `http://127.0.0.1:5173/api/health/dependencies` | Vite proxy to bounded database and FastAPI dependency checks |
+| `http://127.0.0.1:3001/health`                  | Express liveness only                                        |
+| `http://127.0.0.1:3001/health/dependencies`     | Database reachability and authenticated FastAPI readiness    |
+| `http://127.0.0.1:8000/health`                  | FastAPI health                                               |
+
+These checks do not verify Gemini connectivity. Gemini remains disabled or unverified unless an explicitly authorized live request is separately performed.
+
+## Configuration and security
+
+- `.env` and `services/ai/.env` are local configuration files; keep credentials out of source control. `.env.example` files contain placeholders, not secrets.
+- Keep public API tokens and the internal API-to-AI service token on the server side. Never put them in frontend source, Vite-exposed environment variables, screenshots, or logs.
+- Set `AI_PROVIDER=deterministic` and `GEMINI_LIVE_ENABLED=false` for local development. Before any external provider use, the project owner must review account/application eligibility, region, provider terms, and approved data handling. Never send sensitive, personal, confidential, or production security data as test input.
+- Alert titles, payloads, logs, evidence, and model output are untrusted. They cannot change application policy or authorize action.
+- Express validates service output, scopes references to the incident snapshot, and owns persistence and audit. Reference validity does not establish that a statement is semantically supported by evidence.
+- Assignment what-if results are proposals and do not apply assignments. Application requires the authorized Express workflow and its constraints.
+- Health responses distinguish liveness/dependency reachability from provider configuration. A healthy FastAPI service does not mean Gemini is connected.
+
+See [AGENTS.md](AGENTS.md), the [project blueprint](docs/project-blueprint.md), and the [architecture notes](docs/architecture.md) for the trust boundaries and data-handling rules.
+
+## Data and integrations
+
+The repository's sample data is synthetic; [data/demo/README.md](data/demo/README.md) describes the demo records. Versioned synthetic fixtures and ground truth live under `data/synthetic/`. They support development and tests, not claims about detection accuracy in a real SOC.
+
+The current ingestion API accepts validated alert records. The repository does not include verified live vendor connectors for SIEM, EDR, identity, or cloud telemetry. Gemini is an optional server-side analysis adapter, not an ingestion connector or an autonomous response agent. QpiAI Opt and Agent Hive are not integrated. No live external provider request or deployment is claimed.
+
+## Verification
+
+Run the repository checks from its root:
+
+```sh
+pnpm check:env
 pnpm lint
+pnpm format:check
+pnpm typecheck
+pnpm test
 pnpm build
-Python tests can be run with the project's configured environment, for example:
-python -m pytest services/ai/tests
-Use the Python environment and dependency instructions supplied with services/ai. Database integration tests may require PostgreSQL and the correct test database configuration. Report actual command output rather than assuming a check passed because it was started.
-Data and integration status
-CyberNexus supports development with synthetic/sample data so core workflows can be exercised without a live SOC feed. A real connector should only be described as supported after its ingestion path, authentication, error handling, and tests have been implemented and verified.
+git diff --check
+```
 
-The dashboard showing sample data does not by itself mean that CyberNexus is connected to a live security provider. Similarly, the presence of an AI service does not mean an external AI provider is configured. If the AI provider or service is unavailable, behavior depends on the configured deterministic fallback and the current workflow implementation.
-Limitations
-- This is an actively developed project; not every planned feature or integration is necessarily complete.
-- Sample data and synthetic ground truth are not evidence of production detection accuracy.
-- Correlation indicates that alerts may be related; it is not proof that they share a cause.
-- AI-generated investigation output can be incomplete or wrong and must be reviewed against the source evidence.
-- Risk scores and assignment recommendations are only as useful as their documented policy, inputs, and validation.
-- Production deployment requires additional work around operational monitoring, access control, secret management, data retention, resilience, and security review.
-Project roadmap
-The implementation plan is tracked in [`docs/implementation-plan.md`](docs/implementation-plan.md), with the broader project design in [`docs/project-blueprint.md`](docs/project-blueprint.md). These documents are the source of truth for phase status and detailed acceptance criteria.
-Contributing
-1. Create a focused branch for your change.
-2. Make the smallest change that addresses the issue.
-3. Add or update tests and documentation.
-4. Run relevant checks and record their actual results.
-5. Review staged files for secrets and unintended artifacts before committing.
-License
-Check the repository's LICENSE file for the applicable license and terms.
+Run Python service tests with the project environment:
+
+```powershell
+.\services\ai\.venv\Scripts\python.exe -m pytest -q services\ai\tests
+```
+
+```sh
+services/ai/.venv/bin/python -m pytest -q services/ai/tests
+```
+
+`pnpm test` runs shared, API, and web suites. PostgreSQL integration tests are guarded and skip when `CYBERNEXUS_TEST_DATABASE_URL` is absent. When configured, they require a loopback host and the exact dedicated database name `cybernexus_test`; never substitute the development database. Inspect database identity and migration status before running them. `pnpm check:workspace` is an optional frozen-lockfile/offline workspace check; it may require metadata available only in the configured pnpm mirror.
+
+Validation caveats and the last recorded test evidence are in [Phase 17](docs/phase-17-final-validation.md). In particular, a serialized database-backed API suite passed, while the concurrent full API suite has a recorded correlation integration failure; do not interpret the serial result as resolution of that failure. No browser-driven scenario spanning the whole workflow has been completed.
+
+## Known limitations
+
+- No independently validated aggregate evaluation metrics endpoint exists; synthetic ground truth alone is not an evaluation result.
+- Evidence-reference validation is implemented, but semantic evidence support is not verified. Findings preserve uncertainty and require human review.
+- Gemini's adapter has mocked coverage only. Live connectivity and owner eligibility/data-use approval are not verified.
+- QpiAI Opt's safe current API contract and usage constraints remain unverified; no Agent Hive/orchestration workflow is selected.
+- The connected dashboard has API/UI tests, but a browser-to-database end-to-end scenario remains outstanding. Some status endpoints and global data views are unavailable by design and show unknown/unavailable.
+- The concurrent full API run has a recorded integration failure even though isolated and serialized executions passed. See the [Phase 17 validation report](docs/phase-17-final-validation.md).
+- No external deployment, production operations runbook, or license file is included.
+
+## Roadmap and project docs
+
+The [canonical implementation plan](docs/implementation-plan.md) is the single roadmap and records 20 phases, including historical phase mappings. The [project blueprint](docs/project-blueprint.md) describes intended architecture and trust boundaries; intended scope is not evidence that every capability is complete.
+
+| Document                                                                     | Focus                                                           |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [Architecture](docs/architecture.md)                                         | Supporting component boundaries                                 |
+| [Alert ingestion](docs/alert-ingestion.md)                                   | Validation, normalization, authenticated ingest                 |
+| [Correlation and incidents](docs/correlation-and-incidents.md)               | Explainable relationships and incident workflows                |
+| [Analysis and evidence validation](docs/analysis-and-evidence-validation.md) | Deterministic analysis, Gemini adapter, validation limits       |
+| [Prioritization, SLA and audit](docs/prioritization-sla-audit.md)            | Risk policy, deadlines, response suggestions, audit             |
+| [Assignment optimization](docs/assignment-optimization.md)                   | Baseline, constraints, simulation, QpiAI blocker                |
+| [Connected dashboard](docs/connected-soc-dashboard.md)                       | API integration and unavailable views                           |
+| [Node–Python integration](docs/node-python-integration.md)                   | Private service boundary and contract checks                    |
+| [Gemini integration](docs/gemini-provider-integration.md)                    | Provider configuration and verification history                 |
+| [Phase 17 validation](docs/phase-17-final-validation.md)                     | Test evidence, security/evaluation limits, deployment readiness |
+
+## Contributing and license
+
+Contributor guidance is in [AGENTS.md](AGENTS.md). Keep changes within the authorized phase, preserve existing work, use synthetic data for reproducible tests, and document evidence and limitations without overstating provider or product status. There is no separate `CONTRIBUTING.md` at present.
+
+No `LICENSE` file is present, so this repository does not currently specify an open-source license. Do not assume permission to reuse or redistribute it; contact the project owner for licensing terms.
