@@ -1,0 +1,61 @@
+{
+  "identifier": "6d6f6c7b-4833-4c92-8a3e-0f51e4a576d0",
+  "timestamp": "2026-10-28T08:15:00Z",
+  "trimmedTextCases": {
+    "maximumLength": 500,
+    "character": "x",
+    "prefix": " \t",
+    "suffix": "\n ",
+    "emptyWhitespace": " \t \n"
+  },
+  "health": { "status": "ok", "service": "cybernexus-ai" },
+  "error": {
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "Request body did not match the expected format.",
+      "details": [{ "path": ["severity"], "message": "Invalid option." }]
+    }
+  },
+  "conflictError": {
+    "error": {
+      "code": "CONFLICT",
+      "message": "Source event identifier conflicts with stored content."
+    }
+  },
+  "paginationRequest": { "page": 1, "pageSize": 25 },
+  "emptyPaginationResponse": {
+    "items": [],
+    "page": 1,
+    "pageSize": 25,
+    "hasNext": false,
+    "totalItems": 0
+  },
+  "analysisRequest": {
+    "contractVersion": "v1",
+    "requestId": "6d6f6c7b-4833-4c92-8a3e-0f51e4a576d0",
+    "alertIds": ["90a6dff2-2b81-4ed0-8b7d-c458d3cd7b3c"],
+    "evidence": [
+      { "kind": "alert", "id": "90a6dff2-2b81-4ed0-8b7d-c458d3cd7b3c" }
+    ],
+    "context": "Review sign-in anomalies and related evidence.",
+    "options": { "maxFindings": 10, "includeRecommendations": true }
+  },
+  "analysisResult": {
+    "contractVersion": "v1",
+    "requestId": "6d6f6c7b-4833-4c92-8a3e-0f51e4a576d0",
+    "findings": [
+      {
+        "conclusion": "Repeated failed sign-ins may indicate credential guessing.",
+        "rationale": "The supplied alert records repeated failures.",
+        "evidence": [
+          { "kind": "alert", "id": "90a6dff2-2b81-4ed0-8b7d-c458d3cd7b3c" }
+        ],
+        "confidence": 0.72,
+        "uncertainty": "Successful access has not been established.",
+        "verificationStatus": "unverified"
+      }
+    ],
+    "missingInformation": ["Whether any sign-in succeeded."],
+    "recommendedNextSteps": ["Check identity-provider sign-in outcomes."]
+  }
+}

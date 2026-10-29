@@ -7,4 +7,362 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Initial domain models and migrations will be introduced in a later phase.
+enum AlertSeverity {
+  informational
+  low
+  medium
+  high
+  critical
+  unknown
+}
+
+enum IncidentStatus {
+  new
+  triaged
+  investigating
+  resolved
+  closed
+}
+
+enum IncidentPriority {
+  critical
+  high
+  medium
+  low
+  unclassified
+}
+
+enum AnalystAvailability {
+  available
+  unavailable
+}
+
+enum AssignmentStatus {
+  active
+  reassigned
+  completed
+  cancelled
+}
+
+enum EvidenceKind {
+  alert
+  artifact
+  log
+  other
+  relationship
+}
+
+enum AnalysisRunStatus {
+  requested
+  completed
+  failed
+}
+
+enum AnalysisVerificationStatus {
+  unverified
+}
+
+enum AnalysisValidationStatus {
+  references_validated
+  insufficient_evidence
+  reported_conflicts
+}
+
+enum AnalysisContractVersion {
+  v1
+}
+
+enum CorrelationEntityType {
+  user
+  device
+  cloud_resource
+  ip
+}
+
+enum CorrelationRelationshipType {
+  shared_user
+  shared_device
+  shared_cloud_resource
+  shared_ip
+}
+
+enum CorrelationStatus {
+  proposed
+  review_required
+  accepted
+  rejected
+}
+
+model SecurityAlert {
+  id                   String              @id @default(uuid()) @db.Uuid
+  source               String              @db.VarChar(120)
+  externalId           String?             @db.VarChar(200)
+  idempotencyKey       String?             @db.VarChar(180)
+  alertType            String?             @db.VarChar(120)
+  title                String              @db.VarChar(500)
+  severity             AlertSeverity
+  observedAt           DateTime            @db.Timestamptz(6)
+  ingestedAt           DateTime            @default(now()) @db.Timestamptz(6)
+  payload              Json                @db.JsonB
+  sourceMetadata       Json?               @db.JsonB
+  normalizedAttributes Json?               @db.JsonB
+  incidentLinks        IncidentAlert[]
+  analysisLinks        AnalysisRunAlert[]
+  entityLinks          AlertEntity[]
+  sourceRelationships  AlertRelationship[] @relation("CorrelationSource")
+  targetRelationships  AlertRelationship[] @relation("CorrelationTarget")
+
+  @@unique([source, externalId])
+  @@unique([source, idempotencyKey])
+  @@index([observedAt])
+  @@index([severity, observedAt])
+  @@index([alertType, observedAt])
+}
+
+model Incident {
+  id                          String                        @id @default(uuid()) @db.Uuid
+  title                       String                        @db.VarChar(500)
+  description                 String?                       @db.Text
+  status                      IncidentStatus                @default(new)
+  severity                    AlertSeverity
+  needsHumanReview            Boolean?
+  createdAt                   DateTime                      @default(now()) @db.Timestamptz(6)
+  updatedAt                   DateTime                      @updatedAt @db.Timestamptz(6)
+  resolvedAt                  DateTime?                     @db.Timestamptz(6)
+  closedAt                    DateTime?                     @db.Timestamptz(6)
+  priorityOverride            IncidentPriority?
+  priorityOverrideReason      String?                       @db.VarChar(1000)
+  priorityOverrideActorId     String?                       @db.VarChar(120)
+  priorityOverrideAt          DateTime?                     @db.Timestamptz(6)
+  assignmentRequirementsKnown Boolean                       @default(false)
+  correlationKey              String?                       @unique @db.VarChar(64)
+  alertLinks                  IncidentAlert[]
+  assignments                 Assignment[]
+  analyses                    AnalysisRun[]
+  priorityCalculations        IncidentPriorityCalculation[]
+  requiredSkills              IncidentRequiredSkill[]
+
+  @@index([status, severity, createdAt])
+  @@index([updatedAt])
+}
+
+model IncidentPriorityCalculation {
+  id                  String           @id @default(uuid()) @db.Uuid
+  incidentId          String           @db.Uuid
+  policyVersion       String           @db.VarChar(40)
+  calculatedAt        DateTime         @default(now()) @db.Timestamptz(6)
+  riskScore           Int?
+  recommendedPriority IncidentPriority
+  slaState            String           @db.VarChar(40)
+  deadlineAt          DateTime?        @db.Timestamptz(6)
+  inputs              Json             @db.JsonB
+  factors             Json             @db.JsonB
+  incident            Incident         @relation(fields: [incidentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([incidentId, calculatedAt])
+}
+
+model IncidentAlert {
+  incidentId String        @db.Uuid
+  alertId    String        @db.Uuid
+  linkedAt   DateTime      @default(now()) @db.Timestamptz(6)
+  provenance String?       @db.VarChar(500)
+  incident   Incident      @relation(fields: [incidentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  alert      SecurityAlert @relation(fields: [alertId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([incidentId, alertId])
+  @@index([alertId, linkedAt])
+}
+
+model Entity {
+  id         String                @id @default(uuid()) @db.Uuid
+  entityType CorrelationEntityType
+  value      String                @db.VarChar(512)
+  createdAt  DateTime              @default(now()) @db.Timestamptz(6)
+  alertLinks AlertEntity[]
+
+  @@unique([entityType, value])
+  @@index([entityType, createdAt])
+}
+
+model AlertEntity {
+  alertId    String        @db.Uuid
+  entityId   String        @db.Uuid
+  fieldPath  String        @db.VarChar(160)
+  observedAt DateTime      @db.Timestamptz(6)
+  alert      SecurityAlert @relation(fields: [alertId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  entity     Entity        @relation(fields: [entityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([alertId, entityId])
+  @@index([entityId, observedAt])
+}
+
+model AlertRelationship {
+  id                 String                      @id @default(uuid()) @db.Uuid
+  correlationKey     String                      @unique @db.VarChar(64)
+  sourceAlertId      String                      @db.Uuid
+  targetAlertId      String                      @db.Uuid
+  relationshipType   CorrelationRelationshipType
+  confidence         Float
+  rationale          String                      @db.VarChar(1000)
+  evidence           Json                        @db.JsonB
+  status             CorrelationStatus           @default(proposed)
+  correlationVersion String                      @default("v1") @db.VarChar(20)
+  createdAt          DateTime                    @default(now()) @db.Timestamptz(6)
+  sourceAlert        SecurityAlert               @relation("CorrelationSource", fields: [sourceAlertId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  targetAlert        SecurityAlert               @relation("CorrelationTarget", fields: [targetAlertId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([sourceAlertId, targetAlertId, relationshipType])
+  @@index([status, createdAt])
+  @@index([sourceAlertId, targetAlertId])
+}
+
+model AnalysisRun {
+  id                     String                         @id @default(uuid()) @db.Uuid
+  requestId              String                         @unique @db.Uuid
+  contractVersion        AnalysisContractVersion        @default(v1)
+  status                 AnalysisRunStatus              @default(requested)
+  context                String?                        @db.VarChar(4000)
+  maxFindings            Int                            @default(10)
+  includeRecommendations Boolean                        @default(true)
+  requestedAt            DateTime                       @default(now()) @db.Timestamptz(6)
+  completedAt            DateTime?                      @db.Timestamptz(6)
+  abstentionReason       String?                        @db.VarChar(1000)
+  missingInformation     String[]                       @default([])
+  recommendedNextSteps   String[]                       @default([])
+  summary                String?                        @db.VarChar(2000)
+  proposedSeverity       AlertSeverity?
+  analysisConfidence     Float?
+  validationStatus       AnalysisValidationStatus?
+  providerId             String?                        @db.VarChar(120)
+  needsHumanReview       Boolean?
+  humanReviewRationale   String?                        @db.VarChar(1000)
+  reportedConflicts      Json?                          @db.JsonB
+  sourceSnapshotHash     String?                        @db.VarChar(64)
+  incidentId             String?                        @db.Uuid
+  incident               Incident?                      @relation(fields: [incidentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  alerts                 AnalysisRunAlert[]
+  evidence               AnalysisRunEvidenceReference[]
+  findings               AnalysisFinding[]
+
+  @@index([incidentId, requestedAt])
+  @@index([status, requestedAt])
+}
+
+model AnalysisRunAlert {
+  analysisRunId String        @db.Uuid
+  alertId       String        @db.Uuid
+  analysisRun   AnalysisRun   @relation(fields: [analysisRunId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  alert         SecurityAlert @relation(fields: [alertId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([analysisRunId, alertId])
+  @@index([alertId])
+}
+
+model AnalysisRunEvidenceReference {
+  analysisRunId String       @db.Uuid
+  kind          EvidenceKind
+  referenceId   String       @db.Uuid
+  fieldPaths    String[]     @default([])
+  analysisRun   AnalysisRun  @relation(fields: [analysisRunId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([analysisRunId, kind, referenceId])
+  @@index([kind, referenceId])
+}
+
+model AnalysisFinding {
+  id                       String                             @id @default(uuid()) @db.Uuid
+  analysisRunId            String                             @db.Uuid
+  conclusion               String                             @db.VarChar(1000)
+  rationale                String                             @db.VarChar(2000)
+  confidence               Float
+  uncertainty              String?                            @db.VarChar(1000)
+  verificationStatus       AnalysisVerificationStatus         @default(unverified)
+  evidenceValidationStatus AnalysisValidationStatus?
+  analysisRun              AnalysisRun                        @relation(fields: [analysisRunId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  evidence                 AnalysisFindingEvidenceReference[]
+
+  @@index([analysisRunId])
+}
+
+model AnalysisFindingEvidenceReference {
+  analysisFindingId String          @db.Uuid
+  kind              EvidenceKind
+  referenceId       String          @db.Uuid
+  fieldPaths        String[]        @default([])
+  analysisFinding   AnalysisFinding @relation(fields: [analysisFindingId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([analysisFindingId, kind, referenceId])
+  @@index([kind, referenceId])
+}
+
+model Analyst {
+  id                       String              @id @default(uuid()) @db.Uuid
+  displayName              String              @db.VarChar(120)
+  availability             AnalystAvailability @default(unavailable)
+  maxConcurrentAssignments Int?
+  createdAt                DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt                DateTime            @updatedAt @db.Timestamptz(6)
+  skills                   AnalystSkill[]
+  assignments              Assignment[]
+}
+
+model AnalystSkill {
+  analystId String  @db.Uuid
+  skill     String  @db.VarChar(80)
+  analyst   Analyst @relation(fields: [analystId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([analystId, skill])
+  @@index([skill, analystId])
+}
+
+model IncidentRequiredSkill {
+  incidentId String   @db.Uuid
+  skill      String   @db.VarChar(80)
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([incidentId, skill])
+  @@index([skill, incidentId])
+}
+
+model AssignmentOptimizationRun {
+  id               String   @id @db.Uuid
+  algorithmVersion String   @db.VarChar(40)
+  provider         String   @db.VarChar(40)
+  status           String   @db.VarChar(40)
+  actorId          String   @db.VarChar(120)
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+  runtimeMs        Int
+  inputSnapshot    Json     @db.JsonB
+  result           Json     @db.JsonB
+
+  @@index([createdAt])
+  @@index([provider, status, createdAt])
+}
+
+model Assignment {
+  id          String           @id @default(uuid()) @db.Uuid
+  incidentId  String           @db.Uuid
+  analystId   String           @db.Uuid
+  status      AssignmentStatus @default(active)
+  assignedAt  DateTime         @default(now()) @db.Timestamptz(6)
+  explanation String           @db.VarChar(2000)
+  incident    Incident         @relation(fields: [incidentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  analyst     Analyst          @relation(fields: [analystId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([incidentId, assignedAt])
+  @@index([analystId, status, assignedAt])
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  eventType  String   @db.VarChar(120)
+  targetType String   @db.VarChar(120)
+  targetId   String   @db.Uuid
+  actorId    String?  @db.VarChar(120)
+  occurredAt DateTime @default(now()) @db.Timestamptz(6)
+  metadata   Json?    @db.JsonB
+
+  @@index([targetType, targetId, occurredAt])
+  @@index([eventType, occurredAt])
+}

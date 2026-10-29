@@ -58,6 +58,20 @@ describe('AlertInputSchema and SecurityAlertSchema', () => {
     ).toBe(true);
   });
 
+  it('allows a source event identifier to be omitted when the source has none', () => {
+    const { externalId: _externalId, ...withoutExternalId } = validAlert;
+    expect(AlertInputSchema.parse(withoutExternalId)).not.toHaveProperty(
+      'externalId',
+    );
+    expect(
+      SecurityAlertSchema.parse({
+        ...withoutExternalId,
+        id,
+        ingestedAt: timestamp,
+      }),
+    ).not.toHaveProperty('externalId');
+  });
+
   it('rejects missing required fields, invalid severity, and invalid identifiers', () => {
     const { source: _source, ...missingSource } = validAlert;
     expect(AlertInputSchema.safeParse(missingSource).success).toBe(false);

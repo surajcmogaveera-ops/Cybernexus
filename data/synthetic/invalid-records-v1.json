@@ -1,0 +1,46 @@
+[
+  {
+    "caseId": "missing-title",
+    "record": {
+      "source": "demo-idp",
+      "externalId": "invalid-001",
+      "observedAt": "2026-10-29T08:00:00Z",
+      "severity": "high",
+      "payload": { "synthetic": true }
+    }
+  },
+  {
+    "caseId": "invalid-calendar-date",
+    "record": {
+      "source": "demo-edr",
+      "externalId": "invalid-002",
+      "observedAt": "2026-02-30T08:00:00Z",
+      "title": "Synthetic invalid date",
+      "severity": "medium",
+      "payload": { "synthetic": true }
+    }
+  },
+  {
+    "caseId": "unsupported-severity",
+    "record": {
+      "source": "demo-cloud",
+      "externalId": "invalid-003",
+      "observedAt": "2026-10-29T08:00:00Z",
+      "title": "Synthetic unsupported severity",
+      "severity": "catastrophic-but-not-supported",
+      "payload": { "synthetic": true }
+    }
+  },
+  {
+    "caseId": "unexpected-top-level-field",
+    "record": {
+      "source": "demo-network",
+      "externalId": "invalid-004",
+      "observedAt": "2026-10-29T08:00:00Z",
+      "title": "Synthetic unexpected field",
+      "severity": "low",
+      "payload": { "synthetic": true },
+      "groundTruth": "must not be accepted as an application finding"
+    }
+  }
+]

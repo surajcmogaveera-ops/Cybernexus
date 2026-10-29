@@ -54,6 +54,19 @@ describe('API scaffold', () => {
     ).toBe('MALFORMED_JSON');
   });
 
+  it('rejects JSON bodies that exceed the configured request limit', async () => {
+    const response = await fetch(`${baseUrl}/health`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: 'x'.repeat(1_048_577),
+    });
+    expect(response.status).toBe(413);
+    expect(ApiErrorResponseSchema.parse(await response.json()).error).toEqual({
+      code: 'VALIDATION_ERROR',
+      message: 'Request body exceeds the configured size limit.',
+    });
+  });
+
   it('rejects invalid bodies with safe validation details and accepts valid bodies', async () => {
     const validationApp = express();
     validationApp.use(express.json());

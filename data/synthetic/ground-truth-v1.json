@@ -1,0 +1,48 @@
+{
+  "groundTruthVersion": "cybernexus-synthetic-ground-truth-v1",
+  "purpose": "Independent evaluation labels for later correlation work; never ingest or return these labels as application findings.",
+  "expectedRelatedGroups": [
+    {
+      "groupId": "identity-endpoint-cloud-sequence-01",
+      "caseIds": [
+        "identity-sequence-start",
+        "identity-sequence-endpoint",
+        "identity-sequence-cloud"
+      ],
+      "facts": [
+        "The records share the synthetic user identifier demo-user-17.",
+        "The identity and endpoint records also share demo-workstation-17.",
+        "The sequence is an evaluation label, not an ingestion or correlation result."
+      ]
+    }
+  ],
+  "expectedUnrelatedPairs": [
+    {
+      "caseIds": ["identity-sequence-endpoint", "nearby-unrelated-network"],
+      "reason": "Close event times do not establish a shared user, device, or event identifier."
+    },
+    {
+      "caseIds": [
+        "same-host-distinct-event-one",
+        "same-host-distinct-event-two"
+      ],
+      "reason": "Different reliable source event IDs represent distinct observations and must both be retained."
+    }
+  ],
+  "ambiguousPairs": [
+    {
+      "caseIds": [
+        "identity-sequence-start",
+        "shared-address-ambiguous-context"
+      ],
+      "reason": "A shared public/NAT address alone is insufficient to attribute both events to the same user or incident."
+    }
+  ],
+  "untrustedContentCases": [
+    {
+      "caseId": "untrusted-instruction-like-payload",
+      "field": "payload.messageText",
+      "handling": "Retain as source data; never interpret as an instruction."
+    }
+  ]
+}

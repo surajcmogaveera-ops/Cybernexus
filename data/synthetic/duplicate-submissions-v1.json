@@ -1,0 +1,36 @@
+{
+  "exactRetryOf": "identity-sequence-start",
+  "exactRetry": {
+    "source": "demo-idp",
+    "externalId": "identity-evt-100",
+    "alertType": "authentication",
+    "observedAt": "2026-10-29T13:45:00+05:30",
+    "title": "Repeated authentication failures followed by successful sign-in",
+    "severity": "warning",
+    "payload": {
+      "eventType": "authentication",
+      "userId": "demo-user-17",
+      "deviceId": "demo-workstation-17",
+      "sourceIp": "203.0.113.17",
+      "failedAttempts": 6,
+      "result": "success",
+      "synthetic": true
+    }
+  },
+  "conflictingRetry": {
+    "source": "demo-idp",
+    "externalId": "identity-evt-100",
+    "alertType": "authentication",
+    "observedAt": "2026-10-29T13:45:00+05:30",
+    "title": "Changed content for an already used event ID",
+    "severity": "critical",
+    "payload": {
+      "eventType": "authentication",
+      "userId": "demo-user-17",
+      "deviceId": "demo-workstation-17",
+      "sourceIp": "203.0.113.17",
+      "failedAttempts": 99,
+      "synthetic": true
+    }
+  }
+}

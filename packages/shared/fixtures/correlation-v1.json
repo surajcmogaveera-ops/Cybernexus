@@ -1,0 +1,55 @@
+{
+  "request": {
+    "contractVersion": "v1",
+    "requestId": "d80036f4-7fe9-4b9a-b420-41d8fa8e86ab",
+    "alerts": [
+      {
+        "id": "127b55a4-389b-4c85-b0be-4e493e9e9b19",
+        "source": "demo-idp",
+        "alertType": "authentication",
+        "observedAt": "2026-10-29T08:15:00Z",
+        "entities": [
+          {
+            "entityType": "user",
+            "value": "demo-user-17",
+            "fieldPath": "normalizedAttributes.userId"
+          }
+        ]
+      },
+      {
+        "id": "94f4a6a2-80c2-486b-a5ce-33785e34938e",
+        "source": "demo-edr",
+        "alertType": "process-start",
+        "observedAt": "2026-10-29T08:21:00Z",
+        "entities": [
+          {
+            "entityType": "user",
+            "value": "DEMO-USER-17",
+            "fieldPath": "normalizedAttributes.userId"
+          }
+        ]
+      }
+    ]
+  },
+  "result": {
+    "contractVersion": "v1",
+    "requestId": "d80036f4-7fe9-4b9a-b420-41d8fa8e86ab",
+    "relationships": [
+      {
+        "sourceAlertId": "127b55a4-389b-4c85-b0be-4e493e9e9b19",
+        "targetAlertId": "94f4a6a2-80c2-486b-a5ce-33785e34938e",
+        "relationshipType": "shared_user",
+        "confidence": 0.9,
+        "rationale": "Both alerts share a normalized user or account identifier, and their event times are within the configured 120-minute review window. This is a candidate relationship, not a confirmed attack.",
+        "evidence": [
+          {
+            "entityType": "user",
+            "sourceField": "normalizedAttributes.userId",
+            "targetField": "normalizedAttributes.userId"
+          }
+        ],
+        "status": "proposed"
+      }
+    ]
+  }
+}
