@@ -1,85 +1,161 @@
-# CyberNexus
+CyberNexus
+Explainable, AI-assisted security incident triage for Security Operations Centre (SOC) teams.
 
-CyberNexus is an AI-assisted SOC prototype for explainable incident triage and qualified analyst assignment. Its React dashboard can display explicitly labelled synthetic demo fixtures or authenticated incident, alert, analysis, prioritization/SLA, assignment, graph, timeline and incident-audit data from the versioned Express API. See [`docs/connected-soc-dashboard.md`](docs/connected-soc-dashboard.md) for unavailable endpoints and status limits; see [`docs/phase-17-final-validation.md`](docs/phase-17-final-validation.md) for final validation and local demonstration notes.
+CyberNexus is a modular SOC incident-triage platform designed to help analysts make sense of related security alerts, understand why they may belong to the same incident, review evidence-backed analysis, prioritize cases, and distribute work more consistently.
 
-## Prerequisites
+The project emphasizes explainability, evidence validation, deterministic safety checks, and auditable decisions. It is a development project; features that depend on external services, credentials, or a configured database should not be assumed to be enabled in every environment.
+Contents
+- Problem and approach
+- Key capabilities
+- Architecture
+- Technology stack
+- Repository layout
+- Prerequisites
+- Local setup
+- Configuration and security
+- Testing and quality checks
+- Data and integration status
+- Limitations
+- Project roadmap
+Problem and approach
+SOC teams can receive many alerts from identity systems, endpoints, and cloud environments. Looking at each alert independently can make it harder to recognize a wider incident, validate what the evidence actually supports, and decide which case needs attention first.
 
-- Node.js 22 or newer
-- pnpm 11.25.0 (the repository's pinned version)
-- Python 3.11 or newer for the AI service
-- PostgreSQL 16 or newer is used by database-backed API workflows; it is not required to view the synthetic dashboard or use the Express liveness endpoint
+CyberNexus is being built to support that workflow:
+1. Ingest supported alert records and preserve their original information.
+2. Normalize records into a common representation.
+3. Identify potentially related alerts using explainable correlation signals.
+4. Present incidents with links back to the supporting alerts and evidence.
+5. Generate structured investigation assistance and validate its evidence references.
+6. Prioritize incidents using a documented, reproducible risk and response-deadline policy.
+7. Recommend analyst assignments based on relevant skills, availability, workload, and deadlines.
+8. Record important decisions so analysts can understand what changed and why.
+CyberNexus assists investigation; it does not replace analyst judgment or guarantee that an alert is malicious.
+Key capabilities
+The intended and implemented scope is organized around the following capabilities. Availability depends on the current code, configuration, and whether the required services are running.
+- Alert handling: common alert representation and source-record preservation.
+- Explainable correlation: identify potentially related alerts and expose the signals behind a relationship.
+- Incident management: group related alerts into cases while retaining links to their evidence.
+- AI-assisted investigation: produce structured investigation output through the dedicated AI service when configured.
+- Evidence validation: check that cited evidence references correspond to available records and expose uncertainty rather than treating unsupported claims as facts.
+- Deterministic fallback: retain a non-LLM path for supported analysis behavior when AI-provider use is unavailable or disabled.
+- Risk and SLA prioritization: use documented rules to calculate priority and highlight response-deadline risk.
+- Analyst assignment: provide a baseline assignment plan that accounts for skills, availability, capacity, and deadlines.
+- Assignment explanation: make assignment decisions easier to review.
+- What-if re-optimization: evaluate a proposed assignment change without applying it to the live plan.
+- Audit history: retain traceable records of important workflow decisions.
+- Synthetic data and ground truth: support repeatable development and evaluation without requiring access to a real organization’s security telemetry.
+- Security-focused testing: exercise evidence validation, service boundaries, fallback behavior, and prompt-injection resilience.
+The entity-relationship graph, baseline comparisons, optimization integrations, and other advanced capabilities should be treated as available only to the extent they are present and enabled in the checked-out version.
+Architecture
+┌───────────────────────────────────────────────────────────┐
+│                    React + Vite web app                   │
+│       Dashboard · incidents · analysis · workflows        │
+└─────────────────────────────┬─────────────────────────────┘
+                              │ HTTP API
+┌─────────────────────────────▼─────────────────────────────┐
+│                  Node.js + Express API                    │
+│ Alerts · correlation · incidents · prioritization          │
+│ assignment · audit · auth · database access                │
+└───────────────┬──────────────────────┬────────────────────┘
+                │                      │
+                ▼                      ▼
+┌──────────────────────────┐  ┌────────────────────────────┐
+│ PostgreSQL + Prisma      │  │ Python + FastAPI AI service │
+│ Persistent application   │  │ Structured investigation    │
+│ records and relationships│  │ and provider boundary       │
+└──────────────────────────┘  └────────────────────────────┘
+The Express API is the main application backend. The Python/FastAPI service isolates specialized AI investigation functionality behind a service boundary. PostgreSQL is the relational data store, and Prisma is used for schema and database access. Shared TypeScript contracts help keep interfaces consistent across the monorepo.
 
-## Install
+QpiAI Agent Hive and QpiAI Opt are planned/targeted integrations for workflow orchestration and assignment optimization respectively; do not assume either external integration is active unless it is configured and verified in the current environment.
+Technology stack
+Area	Technology
+Web frontend	React, TypeScript, Vite
+Main API	Node.js, Express, TypeScript
+AI service	Python, FastAPI
+Database	PostgreSQL
+ORM and schema	Prisma
+Monorepo package manager	pnpm
+Shared contracts	TypeScript package
+Tests	Project TypeScript test tooling and Python pytest
 
-From the repository root, install the JavaScript workspace from its lockfile:
 
-```sh
-pnpm install --frozen-lockfile
-```
+Repository layout
+.
+├── apps/
+│   ├── api/             # Express API, domain services and API tests
+│   └── web/             # React/Vite user interface
+├── packages/
+│   └── shared/          # Shared TypeScript contracts and types
+├── services/
+│   └── ai/              # FastAPI service and Python tests
+├── docs/                # Blueprint, implementation plan and design notes
+├── prisma/              # Root-level Prisma files, if present in this checkout
+├── pnpm-workspace.yaml
+└── package.json
+The exact set of files may evolve as implementation progresses.
+Prerequisites
+Install the versions compatible with the repository's package manifests:
+- Node.js (an active LTS release recommended)
+- pnpm
+- Python 3
+- PostgreSQL for database-backed workflows
+Some checks and workflows may work without every service running; integration tests that require PostgreSQL or the AI service may need additional configuration.
+Local setup
+Run these commands from the repository root in PowerShell or a compatible terminal.
+1. Install JavaScript dependencies
+pnpm install
+2. Configure environment variables
+Create a local .env file only after checking the repository's environment example, configuration loader, and documentation. Use local development values and keep credentials out of Git.
 
-Set up the AI service environment once:
-
-```powershell
-py -m venv services/ai/.venv
-.\services\ai\.venv\Scripts\python.exe -m pip install -e "services/ai[dev]"
-```
-
-```sh
-python3 -m venv services/ai/.venv
-services/ai/.venv/bin/python -m pip install -e "services/ai[dev]"
-```
-
-Copy `.env.example` to `.env` only if you need to customize local settings (`Copy-Item .env.example .env` in PowerShell or `cp .env.example .env` on macOS/Linux). `API_PORT` defaults to `3001`, and `WEB_ORIGIN` defaults to `http://127.0.0.1:5173`. `DATABASE_URL` is used by Prisma-backed operations; the dashboard's `/health` check does not verify database readiness. `AI_SERVICE_URL` and QpiAI key placeholders do not indicate a connected provider. Analysis defaults to `AI_PROVIDER=deterministic`; Gemini additionally requires a server-side key and `GEMINI_LIVE_ENABLED=true`, which must remain false until owner review of eligibility and data-use terms. The dashboard reads no bearer token or provider key in the browser. Never put real secrets in `.env.example` or frontend variables.
-
-Gemini settings belong in the FastAPI service environment, not the root `.env` loaded by Express. For local setup, copy `services/ai/.env.example` to `services/ai/.env`; keep `GEMINI_LIVE_ENABLED=false` until owner review. The internal service token must match the API's local configuration.
-
-## Develop locally
-
-Start the React/Vite web app and Express API together:
-
-```sh
-pnpm dev
-```
-
-In a second terminal, start FastAPI with the project virtual environment:
-
-```powershell
-.\services\ai\.venv\Scripts\python.exe -m uvicorn cybernexus_ai.main:app --reload --host 127.0.0.1 --port 8000 --app-dir services/ai/src --env-file services/ai/.env
-```
-
-```sh
-services/ai/.venv/bin/python -m uvicorn cybernexus_ai.main:app --reload --host 127.0.0.1 --port 8000 --app-dir services/ai/src --env-file services/ai/.env
-```
-
-The development servers use these local addresses:
-
-- Web: `http://127.0.0.1:5173`
-- Express health: `http://127.0.0.1:3001/health`
-- Vite proxy to Express: `http://127.0.0.1:5173/api/health`
-- FastAPI health: `http://127.0.0.1:8000/health`
-
-The Vite `/api` proxy forwards to Express on port 3001. To stop a service, press `Ctrl+C` in the terminal running it. Uvicorn loads `services/ai/.env` only when started with the documented `--env-file` option; otherwise FastAPI uses the process environment and safe provider defaults. The browser and Express do not receive the Gemini key. The dashboard uses local synthetic fixtures. Its Express indicator checks the real `/health` endpoint through Vite; PostgreSQL is shown as unknown because that liveness endpoint does not check the database, AI service and Gemini provider are shown as unknown because the dashboard only probes Express. It does not probe private FastAPI liveness or external Gemini connectivity. Successful startup does not verify database readiness or external providers.
-
-Alert ingestion, correlation, incident management, AI analysis, evidence validation, prioritization, and assignment are documented in [`docs/alert-ingestion.md`](docs/alert-ingestion.md), [`docs/correlation-and-incidents.md`](docs/correlation-and-incidents.md), [`docs/analysis-and-evidence-validation.md`](docs/analysis-and-evidence-validation.md), [`docs/prioritization-sla-audit.md`](docs/prioritization-sla-audit.md), and [`docs/assignment-optimization.md`](docs/assignment-optimization.md). Connected API workflows require configured Express bearer credentials, a reachable PostgreSQL database, and a private FastAPI service token (`CYBERNEXUS_AI_SERVICE_TOKEN`) held only by the API and AI service. Without a token, the dashboard shows labelled synthetic fixtures; it does not represent them as persisted system data.
-
-## Checks
-
-```sh
-pnpm check:workspace   # offline, frozen lockfile/workspace consistency; does not install packages
-pnpm check:env          # rejects tracked .env files; .env.example is allowed
-pnpm lint
-pnpm format:check
-pnpm typecheck
+At minimum, database-backed workflows need a valid PostgreSQL connection string in the variable expected by the current Prisma/API configuration. Internal service authentication may also be required when the Express API calls the FastAPI service. Use the exact variable names documented by the checked-out code; do not copy placeholder secrets into a shared repository.
+3. Prepare the database
+Review the Prisma schema and available migration scripts before running database commands. Use the migration/deployment command defined by the root package.json and the project's documented development workflow. Do not run destructive database resets against data you need to keep.
+4. Start the services
+Use the scripts defined in the root and workspace package.json files. A typical development workflow starts the API and web app in separate terminals, and starts the FastAPI service when testing AI-assisted investigation.
+pnpm --filter @cybernexus/api dev
+pnpm --filter @cybernexus/web dev
+The exact script names can differ by repository version. Check the package scripts if a command is not defined. Start the Python service using the instructions in services/ai and its package/configuration files.
+Configuration and security
+- Keep .env files, API tokens, database passwords, private keys, and provider credentials out of commits.
+- Check git status, .gitignore, and tracked files before pushing changes. A file already tracked by Git is not made safe merely by adding it to .gitignore.
+- Use scoped, locally generated credentials where the application requires authentication.
+- Keep internal AI-service credentials server-side; do not expose them through frontend environment variables or browser code.
+- Treat alert content and investigation evidence as untrusted input.
+- Validate AI-generated evidence references before displaying findings as supported conclusions.
+- Prefer deterministic policy decisions for risk scoring and assignment constraints; use AI to assist analysis, not to silently override validation or authorization.
+- Use synthetic or explicitly authorized telemetry for development and testing.
+- Do not connect the application to production security systems without appropriate authorization and review.
+Testing and quality checks
+Run the scripts that actually exist in the current checkout. Start by inspecting available scripts:
+pnpm run
+pnpm --filter @cybernexus/api run
+pnpm --filter @cybernexus/web run
+Common checks, when defined by the repository, include:
 pnpm test
+pnpm typecheck
+pnpm lint
 pnpm build
-```
+Python tests can be run with the project's configured environment, for example:
+python -m pytest services/ai/tests
+Use the Python environment and dependency instructions supplied with services/ai. Database integration tests may require PostgreSQL and the correct test database configuration. Report actual command output rather than assuming a check passed because it was started.
+Data and integration status
+CyberNexus supports development with synthetic/sample data so core workflows can be exercised without a live SOC feed. A real connector should only be described as supported after its ingestion path, authentication, error handling, and tests have been implemented and verified.
 
-Run the Python tests with the project environment:
-
-```powershell
-.\services\ai\.venv\Scripts\python.exe -m pytest -q services\ai\tests
-```
-
-```sh
-services/ai/.venv/bin/python -m pytest -q services/ai/tests
-```
+The dashboard showing sample data does not by itself mean that CyberNexus is connected to a live security provider. Similarly, the presence of an AI service does not mean an external AI provider is configured. If the AI provider or service is unavailable, behavior depends on the configured deterministic fallback and the current workflow implementation.
+Limitations
+- This is an actively developed project; not every planned feature or integration is necessarily complete.
+- Sample data and synthetic ground truth are not evidence of production detection accuracy.
+- Correlation indicates that alerts may be related; it is not proof that they share a cause.
+- AI-generated investigation output can be incomplete or wrong and must be reviewed against the source evidence.
+- Risk scores and assignment recommendations are only as useful as their documented policy, inputs, and validation.
+- Production deployment requires additional work around operational monitoring, access control, secret management, data retention, resilience, and security review.
+Project roadmap
+The implementation plan is tracked in [`docs/implementation-plan.md`](docs/implementation-plan.md), with the broader project design in [`docs/project-blueprint.md`](docs/project-blueprint.md). These documents are the source of truth for phase status and detailed acceptance criteria.
+Contributing
+1. Create a focused branch for your change.
+2. Make the smallest change that addresses the issue.
+3. Add or update tests and documentation.
+4. Run relevant checks and record their actual results.
+5. Review staged files for secrets and unintended artifacts before committing.
+License
+Check the repository's LICENSE file for the applicable license and terms.
